@@ -26,6 +26,7 @@ import dev.pinboard.store.FeedbackListener
 import dev.pinboard.store.FeedbackStore
 import dev.pinboard.mcp.StaleDetector
 import java.awt.BorderLayout
+import java.awt.FlowLayout
 import java.awt.event.KeyEvent
 import java.awt.event.MouseEvent
 import javax.swing.JComponent
@@ -53,6 +54,7 @@ class FeedbackListPanel(
   private val tree = Tree(DefaultTreeModel(DefaultMutableTreeNode("root")))
   private val detail: FeedbackDetailPanel
   private val pendingLabel = JBLabel()
+  private val connectionChip = ConnectionChip()
 
   /**
    * Rebuilds run on a pooled thread and are coalesced: a batch of agent updates would otherwise
@@ -83,7 +85,7 @@ class FeedbackListPanel(
     installRowActions()
 
     toolbar = buildToolbar()
-    setContent(buildSplitter())
+    setContent(buildContent())
 
     project.messageBus.connect(this).subscribe(FeedbackListener.TOPIC, this)
     onChanged()  // initial load
@@ -98,6 +100,20 @@ class FeedbackListPanel(
     if (disposed) return
     alarm.cancelAllRequests()
     alarm.addRequest({ rebuildOffEdt() }, COALESCE_MS)
+  }
+
+  /**
+   * The queue over the connection footer.
+   *
+   * The footer owns the only timer here and pushes each refresh into the toolbar chip, so the two
+   * readings of "is the agent talking to us" come from one evaluation and cannot disagree.
+   */
+  private fun buildContent(): JComponent {
+    val footer = FooterStatusPanel(project, this) { connectionChip.update(it) }
+    return JPanel(BorderLayout()).apply {
+      add(buildSplitter(), BorderLayout.CENTER)
+      add(footer, BorderLayout.SOUTH)
+    }
   }
 
   private fun buildSplitter(): JComponent {
@@ -132,12 +148,17 @@ class FeedbackListPanel(
       .createActionToolbar(ActionPlaces.TOOLWINDOW_CONTENT, group, true)
     actionToolbar.targetComponent = tree
 
-    pendingLabel.border = JBUI.Borders.emptyRight(8)
+    // No right border: the FlowLayout below already spaces the badge from the chip.
     pendingLabel.foreground = UIUtil.getContextHelpForeground()
+
+    val right = JPanel(FlowLayout(FlowLayout.RIGHT, JBUI.scale(6), JBUI.scale(2)))
+    right.isOpaque = false
+    right.add(pendingLabel)
+    right.add(connectionChip)
 
     val bar = JPanel(BorderLayout())
     bar.add(actionToolbar.component, BorderLayout.WEST)
-    bar.add(pendingLabel, BorderLayout.EAST)
+    bar.add(right, BorderLayout.EAST)
     return bar
   }
 

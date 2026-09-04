@@ -104,6 +104,22 @@ MCP server, not to this plugin. Reconnect (`/mcp` in Claude Code) and ask the ag
 queue is untouched: nothing is lost, and an acknowledged item is still sitting there waiting to be
 resolved.
 
+## Is the agent actually connected?
+
+The chip at the top right of the tool window answers that, and the line along the bottom says when
+the agent last called a tool. Open **Log** next to it for the raw list of calls.
+
+| Chip | What it means |
+|---|---|
+| **Agent active** | A tool call arrived in the last ten minutes |
+| **Idle** | An agent has called before, but not lately. Normal between tasks |
+| **Waiting for agent** | Everything is wired up; nothing has called yet |
+| **Tools not registered** | The plugin loaded without its MCP tools. Restart the IDE |
+
+The chip never says "connected". This plugin rides the IDE's MCP server rather than running its own,
+so it cannot ask whether a client is attached - it can only report calls that actually arrived, and
+it says exactly that much and no more.
+
 ## Where your code goes
 
 Nowhere. The plugin makes no network calls and collects no telemetry.
@@ -129,3 +145,6 @@ Requires JDK 21.
 ## License
 
 [Apache-2.0](LICENSE)
+
+Parts of the tool window's presentation are adapted from
+[Marginalia](https://github.com/borgand/marginalia) (MIT). See [NOTICE](NOTICE).

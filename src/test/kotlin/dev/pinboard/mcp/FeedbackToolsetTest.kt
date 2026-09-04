@@ -95,6 +95,40 @@ class FeedbackToolsetTest : BasePlatformTestCase() {
         it.jsonObject.getValue("status").jsonPrimitive.content
     }
 
+  /**
+   * The connection chip has no other source of truth: the MCP server belongs to the IDE, so a tool
+   * call landing here is the only evidence that an agent reached the plugin. If a tool ever stops
+   * recording, the chip goes quietly wrong instead of failing loudly.
+   */
+  fun testEveryToolRecordsThatTheAgentReachedUs() {
+    val store = FeedbackStore.getInstance(project)
+    val activity = McpActivity.getInstance(project)
+    store.deleteAll()
+
+    val invocations = listOf(
+      "feedback_list" to buildJsonObject { },
+      "feedback_acknowledge" to idsArray("nothing"),
+      "feedback_resolve" to buildJsonObject { putString("id", "r1"); putString("summary", "done") },
+      "feedback_dismiss" to buildJsonObject { putString("id", "d1"); putString("reason", "no") },
+      "feedback_reply" to buildJsonObject { putString("id", "p1"); putString("message", "why?") },
+      "feedback_clear_resolved" to buildJsonObject { },
+      "feedback_watch" to buildJsonObject { putInt("timeoutSeconds", 1); putInt("batchWindowSeconds", 1) },
+    )
+
+    for ((tool, args) in invocations) {
+      // resolve/dismiss/reply need a live item, and each one consumes it.
+      store.add(item("r1"))
+      store.add(item("d1"))
+      store.add(item("p1"))
+
+      call(tool, args)
+
+      assertEquals("$tool did not record activity", tool, activity.lastCall?.name)
+    }
+
+    store.deleteAll()
+  }
+
   fun testAllSevenToolsRegistered() {
     val expected = setOf(
       "feedback_list",

@@ -1,0 +1,7 @@
+This product adapts UI patterns from Marginalia
+(https://github.com/borgand/marginalia), Copyright (c) 2026 Laas Toom,
+licensed under the MIT License.
+
+The adapted work is presentation only: the rounded status pill, and the
+connection chip with its footer status line and activity log. No Marginalia
+source file is redistributed here.
