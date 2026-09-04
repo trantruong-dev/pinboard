@@ -1,0 +1,81 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Compile and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Test
+        run: ./gradlew test --stacktrace
+
+      - name: Build plugin
+        run: ./gradlew buildPlugin --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: build/reports/tests/test
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plugin-distribution
+          path: build/distributions/*.zip
+
+  verify:
+    name: Verify against ${{ matrix.ide }}
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # A non-IDEA IDE has to be in here. The plugin only depends on
+        # com.intellij.modules.platform and com.intellij.mcpServer, and this matrix is what proves
+        # that claim rather than assuming it.
+        ide:
+          - IC-2025.2
+          - IC-2025.3
+          - PY-2025.2
+          - WS-2025.2
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # A compatibility problem fails the build. The verifier reporting a problem and the job
+      # still going green would make this step decorative.
+      - name: Plugin verifier
+        run: >-
+          ./gradlew verifyPlugin
+          -PverifyIde=${{ matrix.ide }}
+          --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verifier-report-${{ matrix.ide }}
+          path: build/reports/pluginVerifier

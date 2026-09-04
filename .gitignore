@@ -1,0 +1,21 @@
+# Gradle
+.gradle/
+build/
+out/
+.kotlin/
+
+# IntelliJ Platform Gradle Plugin sandbox.
+# Must never be committed: the sandbox system dir holds the feedback store, which contains
+# verbatim source code from whatever project was open in it.
+.intellijPlatform/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+
+.DS_Store
+
+# Working plans and reports stay local - they are session notes, not product.
+plans/

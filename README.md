@@ -1,0 +1,131 @@
+# Pinboard
+
+Pin feedback onto several pieces of code, then tell your agent to work through the lot.
+
+Adds an asynchronous feedback queue on top of the MCP server your JetBrains IDE already ships.
+
+## Why this exists
+
+Your IDE's built-in MCP server can already hand an agent your current selection. That is a
+synchronous, one-shot channel: you point at something, the agent looks at it, the moment is gone.
+
+Reviewing code is not like that. You read through a file and spot five things. You want to note
+all five, keep reading, and hand the batch over when you are done - and you want a record of what
+you asked for and what the agent did about it.
+
+That is what this plugin adds:
+
+- **A queue.** Pin as many notes as you like, whenever you like. Nothing is sent yet.
+- **Batching.** The agent picks up a cluster of feedback in one call instead of one round trip
+  each.
+- **Threads.** The agent replies, asks questions, and records what it did. You read that back
+  next to the code you pinned.
+- **It survives a restart.** Close the IDE, reopen it, the queue is still there with its history.
+- **A stale flag.** If the code moved or changed after you pinned it, the agent is told so, and
+  is given the original snapshot and the enclosing symbol to relocate from.
+
+## Requirements
+
+- Any JetBrains IDE, build 252 (2025.2) or newer
+- The bundled **MCP Server** plugin enabled - it ships with the IDE
+
+## Install
+
+1. **Settings | Plugins | Marketplace**, search for *Pinboard*, Install, restart the
+   IDE.
+2. Connect your agent to the IDE's MCP server. In 2025.2 this lives under
+   **Settings | Tools | MCP Server**; in 2026.x it moved to
+   **Settings | Tools | Client Auto-Configuration**. Claude Code is configured with one click -
+   the IDE writes the entry for you.
+3. Restart your agent so it picks up the new server.
+
+There is no MCP configuration to write by hand. The tools appear on the IDE's existing server.
+
+The plugin requires an IDE restart when installed or updated. That is deliberate: it registers
+MCP tools, and a partial hot-reload would leave the tool window running while the tools silently
+disappeared.
+
+## Use
+
+**Pin a selection.** Select code, right-click, **Pin for Agent**
+(`Ctrl+Alt+Shift+F`, `Cmd+Alt+Shift+F` on macOS). Type your note.
+
+**Pin a whole file.** Right-click the file in the Project view or its editor tab, **Feedback to
+Agent (File)**.
+
+**Review the queue.** The **Pinboard** tool window on the right shows everything grouped by
+status, with the agent's replies. Double-click an item to jump back to the code. Delete a single
+item with the Del key, the toolbar button, or the row's context menu.
+
+## Teaching your agent to use it
+
+The tools are available as soon as the plugin is installed, but an agent will not know when to
+reach for them. For Claude Code, copy [`claude-skill/SKILL.md`](claude-skill/SKILL.md) into
+`~/.claude/skills/pinboard/SKILL.md`. It tells the agent to pick up batches, how to
+read the `stale` flag, and to close each item with a summary you can audit.
+
+## The tools
+
+| Tool | What it does |
+|---|---|
+| `feedback_list` | Current queue. PENDING and ACKNOWLEDGED by default. |
+| `feedback_watch` | Blocks until new items arrive, returns them as one batch. |
+| `feedback_acknowledge` | Marks items as seen. Takes a whole batch at once. |
+| `feedback_resolve` | Closes an item with a required summary of what was done. |
+| `feedback_dismiss` | Closes an item with a required reason for not acting. |
+| `feedback_reply` | Adds a question or note to an item's thread, status unchanged. |
+| `feedback_clear_resolved` | Deletes items that are already resolved or dismissed. |
+
+**The agent cannot create feedback, and cannot delete anything still pending.** The queue is your
+record of what you asked for. An agent that could quietly clear work it had not finished would
+destroy the only copy of it.
+
+## One queue per project
+
+Queues never mix. Each project gets its own file, named from a hash of the project's base path,
+and the tool window and MCP tools both read the queue of the project they were opened in. Open ten
+projects at once and an agent working in one of them sees only that one's feedback.
+
+The path is normalised first, so the same project keeps its queue whether the IDE reports it with
+forward or backslashes, with or without a trailing slash. Case is left alone on purpose - paths are
+case-sensitive on Linux, and folding it would merge two genuinely different projects.
+
+## Known limitations
+
+**Two IDE windows on the same repository share one queue.** That is deliberate, and thread messages
+from both sides are merged rather than dropped. But everything else on an item - the note itself,
+its status - still resolves last-write-wins: edit the same item from both windows at once and one
+edit is lost. Resolving that properly needs per-field timestamps or a CRDT, which is a steep price
+for a notes queue. If you work this way, edit an item from one window at a time.
+
+**A long agent turn can outlive the IDE's MCP session.** If your agent reports
+`HTTP 404: Session not found`, the SSE session dropped - the session belongs to the IDE's built-in
+MCP server, not to this plugin. Reconnect (`/mcp` in Claude Code) and ask the agent to retry. The
+queue is untouched: nothing is lost, and an acknowledged item is still sitting there waiting to be
+resolved.
+
+## Where your code goes
+
+Nowhere. The plugin makes no network calls and collects no telemetry.
+
+The queue is stored as JSON under the IDE's system directory
+(`PathManager.getSystemPath()/pinboard/`), one file per project, outside your repository so
+it never lands in a commit. **It contains verbatim source code** - the snapshot of everything you
+pin - so treat it with the same care as the repository itself.
+
+The MCP server that serves these tools is the IDE's own, bound to localhost.
+
+## Building from source
+
+```
+./gradlew build          # compile and test
+./gradlew runIde         # launch a sandbox IDE with the plugin
+./gradlew verifyPlugin   # JetBrains plugin verifier
+./gradlew buildPlugin    # produces build/distributions/*.zip
+```
+
+Requires JDK 21.
+
+## License
+
+[Apache-2.0](LICENSE)

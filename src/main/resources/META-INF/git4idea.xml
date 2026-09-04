@@ -1,0 +1,6 @@
+<idea-plugin>
+  <!-- Git4Idea-dependent code (VcsRevisionResolver) is loaded lazily and guards failures with
+       try/catch, so it can live in the main jar even when this optional plugin is absent.
+       This file exists so the optional dependency declaration satisfies the platform's
+       "config-file required" rule. -->
+</idea-plugin>

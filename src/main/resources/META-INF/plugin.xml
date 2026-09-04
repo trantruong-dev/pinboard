@@ -1,0 +1,46 @@
+<!-- require-restart: the plugin is not unload-safe (its class loader cannot be released), so a
+     dynamic load/unload leaves it half-live - the tool window keeps working while the mcpToolset
+     extension is silently gone, with no error shown. Forcing a restart makes install and update
+     all-or-nothing instead. -->
+<idea-plugin require-restart="true">
+  <id>dev.pinboard.agent</id>
+  <name>Pinboard</name>
+  <vendor>Pinboard</vendor>
+
+  <depends>com.intellij.modules.platform</depends>
+  <depends>com.intellij.mcpServer</depends>
+  <depends optional="true" config-file="git4idea.xml">Git4Idea</depends>
+
+  <extensions defaultExtensionNs="com.intellij.mcpServer">
+    <mcpToolset implementation="dev.pinboard.mcp.FeedbackToolset"/>
+  </extensions>
+
+  <extensions defaultExtensionNs="com.intellij">
+    <toolWindow id="Pinboard"
+                anchor="right"
+                icon="dev.pinboard.ui.toolwindow.PinboardIcons.ToolWindow"
+                factoryClass="dev.pinboard.ui.toolwindow.FeedbackToolWindowFactory"/>
+    <notificationGroup id="Pinboard" displayType="BALLOON"/>
+  </extensions>
+
+  <actions>
+    <action id="dev.pinboard.CaptureSelection"
+            class="dev.pinboard.actions.CaptureSelectionAction"
+            text="Pin for Agent"
+            description="Pin this selection onto the Pinboard for your agent">
+      <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+      <!-- Ctrl+Alt+Shift+F is unbound in $default, but the macOS keymap - which inherits from
+           $default - gives it to EditorNextWordWithSelection, so Mac needs its own combination.
+           Cmd+Alt+Shift+F is unbound in both. -->
+      <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt shift F"/>
+      <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta alt shift F" replace-all="true"/>
+    </action>
+    <action id="dev.pinboard.CaptureFile"
+            class="dev.pinboard.actions.CaptureFileAction"
+            text="Pin File for Agent"
+            description="Pin this whole file onto the Pinboard for your agent">
+      <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+      <add-to-group group-id="EditorTabPopupMenu" anchor="last"/>
+    </action>
+  </actions>
+</idea-plugin>
