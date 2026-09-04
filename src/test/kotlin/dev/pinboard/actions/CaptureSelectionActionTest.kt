@@ -121,4 +121,36 @@ class CaptureSelectionActionTest : BasePlatformTestCase() {
     assertEquals(1, store.all().single().startLine)
     store.deleteAll()
   }
+
+  /**
+   * Both capture paths gate on the same [dev.pinboard.ui.dialog.FeedbackForm], so a blank note is
+   * refused once, in one place. A pin with no note tells the agent nothing and cannot be acted on.
+   */
+  fun testABlankNoteIsRefusedByTheSharedForm() {
+    val form = dev.pinboard.ui.dialog.FeedbackForm(null)
+    assertFalse("nothing typed", form.hasNote())
+
+    form.noteArea.text = "   " + System.lineSeparator() + "   "
+    assertFalse("only whitespace", form.hasNote())
+
+    form.noteArea.text = "  fix this  "
+    assertTrue("real text", form.hasNote())
+    assertEquals("fix this", form.note())
+  }
+
+  /**
+   * The modal path reads its note through that same form rather than a text area of its own, which
+   * is what stops the two capture paths from drifting apart on what counts as a usable note.
+   */
+  fun testTheDialogReadsItsNoteThroughTheSharedForm() {
+    val dialog = dev.pinboard.ui.dialog.FeedbackInputDialog(project, null)
+    try {
+      assertEquals("", dialog.note)
+      val form = dialog.preferredFocusedComponent as javax.swing.JTextArea
+      form.text = "  fix this  "
+      assertEquals("fix this", dialog.note)
+    } finally {
+      com.intellij.openapi.util.Disposer.dispose(dialog.disposable)
+    }
+  }
 }

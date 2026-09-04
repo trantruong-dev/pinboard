@@ -22,6 +22,7 @@
                 factoryClass="dev.pinboard.ui.toolwindow.FeedbackToolWindowFactory"/>
     <notificationGroup id="Pinboard" displayType="BALLOON"/>
     <editorTabColorProvider implementation="dev.pinboard.ui.editor.FeedbackTabColorProvider"/>
+    <editorFloatingToolbarProvider implementation="dev.pinboard.ui.PinboardFloatingToolbarProvider"/>
   </extensions>
 
   <projectListeners>
@@ -50,5 +51,12 @@
       <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
       <add-to-group group-id="EditorTabPopupMenu" anchor="last"/>
     </action>
+
+    <!-- The button that floats over a selection. A group of its own because the platform addresses
+         a floating toolbar by group id, and because keeping it separate means the floating button
+         can be dropped without touching the action itself. -->
+    <group id="Pinboard.FloatingToolbar">
+      <reference ref="dev.pinboard.CaptureSelection"/>
+    </group>
   </actions>
 </idea-plugin>

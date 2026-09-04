@@ -38,7 +38,7 @@ class CaptureSelectionAction : AnAction() {
     val editor = e.getData(CommonDataKeys.EDITOR) ?: return
     val file = e.getData(CommonDataKeys.VIRTUAL_FILE) ?: return
     if (!isCapturableFile(file, project)) return
-    CaptureActionSupport.capture(project, Scope.SELECTION) {
+    CaptureActionSupport.captureInline(project, editor, Scope.SELECTION) {
       SnapshotCaptureService.getInstance(project).captureSelection(editor, file)
     }
   }
