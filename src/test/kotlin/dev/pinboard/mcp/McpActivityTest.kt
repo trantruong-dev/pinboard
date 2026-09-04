@@ -35,14 +35,26 @@ class McpActivityTest : BasePlatformTestCase() {
    * no test can substitute for it. This is a smoke test for the field under contention, no more.
    */
   fun testConcurrentRecordsAreNeverObservedPartially() {
+    val names = listOf("feedback_list", "feedback_watch", "feedback_resolve")
     val seen = CopyOnWriteArrayList<ToolCall>()
+    val observing = CountDownLatch(1)
     val stop = CountDownLatch(1)
     val reader = Thread {
-      while (stop.count > 0) activity.lastCall?.let { seen.add(it) }
+      while (stop.count > 0) {
+        activity.lastCall?.let {
+          seen.add(it)
+          observing.countDown()
+        }
+      }
     }
     reader.start()
 
-    val names = listOf("feedback_list", "feedback_watch", "feedback_resolve")
+    // Wait for the reader to actually be reading before writing the batch it is meant to race.
+    // Without this the writes can finish before the new thread is first scheduled, and the test
+    // asserts against an empty list on a loaded machine.
+    activity.record(names[0])
+    assertTrue("reader thread never ran", observing.await(30, TimeUnit.SECONDS))
+
     repeat(300) { activity.record(names[it % names.size]) }
     stop.countDown()
     reader.join(5_000)
