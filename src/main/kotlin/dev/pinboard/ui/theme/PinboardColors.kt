@@ -38,6 +38,21 @@ object PinboardColors {
   /** Positive progress: ACKNOWLEDGED items, and an agent that called recently. */
   val statusActive: JBColor get() = JBColor.namedColor("Banner.successBackground", JBColor(0x2E9E45, 0x77C97D))
 
+  /**
+   * Closed and archived: RESOLVED / DISMISSED.
+   *
+   * A deliberately fixed blue rather than [accent]: a theme's accent is not guaranteed to read as
+   * blue, and this has to stay distinct from [statusActive] and [statusPending] in the progress
+   * ribbon, where all three sit side by side.
+   */
+  val statusDone: JBColor get() = JBColor.namedColor("Notification.MoreButton.foreground", JBColor(0x3574F0, 0x548AF7))
+
+  /** Body text: notes and filenames. */
+  val textPrimary: JBColor get() = JBColor.lazy { UIUtil.getLabelForeground() }
+
+  /** The selected row. */
+  val selectionBg: JBColor get() = JBColor.namedColor("List.selectionBackground", JBColor(0xD5E4FF, 0x2E436E))
+
   /** Something is wrong and the user has to act: a missing file, tools that never registered. */
   val statusError: JBColor get() = JBColor.namedColor("Component.errorFocusColor", JBColor(0xE53E4D, 0xF75464))
 

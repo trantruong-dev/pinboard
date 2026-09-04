@@ -6,11 +6,13 @@ import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import dev.pinboard.model.Feedback
 import dev.pinboard.model.Scope
+import dev.pinboard.model.Status
 import dev.pinboard.store.FeedbackStore
 import dev.pinboard.util.ProjectFiles
 
@@ -66,6 +68,47 @@ class DeleteFeedbackAction(
     val feedback = selection.selected() ?: return
     FeedbackStore.getInstance(project).delete(feedback.id)
   }
+}
+
+/**
+ * The "Clear" dropdown.
+ *
+ * A popup group rather than one Delete All button so the finished work can be cleared without
+ * touching the queue. Each entry shows a live count and disables itself when empty, which is what
+ * makes it safe to open and read - the user can see what a click would remove before clicking it.
+ */
+class ClearFeedbackActionGroup(project: Project) : DefaultActionGroup("Clear", true) {
+
+  init {
+    templatePresentation.icon = AllIcons.Actions.GC
+    templatePresentation.description = "Remove finished feedback, or the whole queue"
+    add(ClearByStatusAction(project, Status.RESOLVED))
+    add(ClearByStatusAction(project, Status.DISMISSED))
+    add(DeleteAllFeedbackAction(project))
+  }
+}
+
+/** Removes every item in one finished status. Not confirmed: the work it deletes is already done. */
+private class ClearByStatusAction(
+  private val project: Project,
+  private val status: Status,
+) : AnAction() {
+
+  override fun getActionUpdateThread() = ActionUpdateThread.EDT
+
+  override fun update(e: AnActionEvent) {
+    val count = matching().size
+    e.presentation.text = "Clear ${status.name.lowercase()} ($count)"
+    e.presentation.isEnabled = count > 0
+  }
+
+  override fun actionPerformed(e: AnActionEvent) {
+    val store = FeedbackStore.getInstance(project)
+    matching().forEach { store.delete(it.id) }
+  }
+
+  private fun matching(): List<Feedback> =
+    FeedbackStore.getInstance(project).all().filter { it.status == status }
 }
 
 /** Clears the whole queue. Confirmed because it is not undoable. */

@@ -7,8 +7,6 @@ import dev.pinboard.model.Feedback
 import dev.pinboard.model.Scope
 import dev.pinboard.model.Status
 import dev.pinboard.store.FeedbackStore
-import javax.swing.tree.DefaultMutableTreeNode
-import javax.swing.tree.TreePath
 
 class FeedbackListPanelTest : BasePlatformTestCase() {
 
@@ -48,25 +46,24 @@ class FeedbackListPanelTest : BasePlatformTestCase() {
     fail("Timed out waiting for: $what")
   }
 
-  private fun groups(panel: FeedbackListPanel): List<StatusGroupNode> {
-    val root = panel.treeForTest().model.root as DefaultMutableTreeNode
-    return (0 until root.childCount).map {
-      (root.getChildAt(it) as DefaultMutableTreeNode).userObject as StatusGroupNode
-    }
+  private fun headers(panel: FeedbackListPanel): List<FeedbackRow.StatusHeader> {
+    val model = panel.listForTest().model
+    return (0 until model.size)
+      .map { model.getElementAt(it) }
+      .filterIsInstance<FeedbackRow.StatusHeader>()
   }
 
-  private fun nodeFor(panel: FeedbackListPanel, id: String): DefaultMutableTreeNode? {
-    val root = panel.treeForTest().model.root as DefaultMutableTreeNode
-    for (g in 0 until root.childCount) {
-      val group = root.getChildAt(g) as DefaultMutableTreeNode
-      for (i in 0 until group.childCount) {
-        val node = group.getChildAt(i) as DefaultMutableTreeNode
-        val payload = node.userObject as? FeedbackItemNode ?: continue
-        if (payload.feedback.id == id) return node
-      }
+  private fun indexOf(panel: FeedbackListPanel, id: String): Int {
+    val model = panel.listForTest().model
+    for (i in 0 until model.size) {
+      val row = model.getElementAt(i)
+      if (row is FeedbackRow.Item && row.node.feedback.id == id) return i
     }
-    return null
+    return -1
   }
+
+  private fun selectedId(panel: FeedbackListPanel): String? =
+    (panel.listForTest().selectedValue as? FeedbackRow.Item)?.node?.feedback?.id
 
   fun testGroupsAndPendingBadgeReflectStore() {
     val store = FeedbackStore.getInstance(project)
@@ -77,9 +74,9 @@ class FeedbackListPanelTest : BasePlatformTestCase() {
     val panel = newPanel()
     waitFor("initial render") { panel.pendingCountForTest() == 3 }
 
-    assertEquals(listOf(Status.PENDING, Status.RESOLVED), groups(panel).map { it.status })
-    assertEquals(3, groups(panel)[0].count)
-    assertEquals(2, groups(panel)[1].count)
+    assertEquals(listOf(Status.PENDING, Status.RESOLVED), headers(panel).map { it.status })
+    assertEquals(3, headers(panel)[0].total)
+    assertEquals(2, headers(panel)[1].total)
   }
 
   /**
@@ -98,8 +95,8 @@ class FeedbackListPanelTest : BasePlatformTestCase() {
     repeat(5) { store.updateStatus("id$it", Status.RESOLVED) }
     waitFor("panel reflects agent resolves") { panel.pendingCountForTest() == 15 }
 
-    assertEquals(15, groups(panel).first { it.status == Status.PENDING }.count)
-    assertEquals(5, groups(panel).first { it.status == Status.RESOLVED }.count)
+    assertEquals(15, headers(panel).first { it.status == Status.PENDING }.total)
+    assertEquals(5, headers(panel).first { it.status == Status.RESOLVED }.total)
   }
 
   fun testSelectionSurvivesRebuild() {
@@ -110,15 +107,13 @@ class FeedbackListPanelTest : BasePlatformTestCase() {
     val panel = newPanel()
     waitFor("initial render") { panel.pendingCountForTest() == 5 }
 
-    val node = nodeFor(panel, "keep2")!!
-    panel.treeForTest().selectionPath = TreePath(node.path)
+    panel.listForTest().selectedIndex = indexOf(panel, "keep2")
 
     // An unrelated item changes status; the user's cursor must not move.
     store.updateStatus("keep4", Status.ACKNOWLEDGED)
     waitFor("panel reflects the status change") { panel.pendingCountForTest() == 4 }
 
-    val selected = panel.treeForTest().lastSelectedPathComponent as? DefaultMutableTreeNode
-    assertEquals("keep2", (selected?.userObject as? FeedbackItemNode)?.feedback?.id)
+    assertEquals("keep2", selectedId(panel))
   }
 
   fun testDeletedItemClearsSelectionInsteadOfThrowing() {
@@ -128,13 +123,36 @@ class FeedbackListPanelTest : BasePlatformTestCase() {
 
     val panel = newPanel()
     waitFor("initial render") { panel.pendingCountForTest() == 1 }
-    panel.treeForTest().selectionPath = TreePath(nodeFor(panel, "gone")!!.path)
+    panel.listForTest().selectedIndex = indexOf(panel, "gone")
 
     store.delete("gone")
     waitFor("panel empties") { panel.pendingCountForTest() == 0 }
 
-    assertNull(panel.treeForTest().lastSelectedPathComponent)
-    assertEquals(emptyList<StatusGroupNode>(), groups(panel))
+    assertNull(selectedId(panel))
+    assertEquals(emptyList<FeedbackRow.StatusHeader>(), headers(panel))
+  }
+
+  /**
+   * Folding is the whole reason the list keeps state of its own, and a rebuild happens whenever an
+   * agent touches the queue. A group the user folded must stay folded through one.
+   */
+  fun testFoldedGroupStaysFoldedAcrossAnAgentUpdate() {
+    val store = FeedbackStore.getInstance(project)
+    store.deleteAll()
+    repeat(3) { store.add(item("fold$it")) }
+
+    val panel = newPanel()
+    waitFor("initial render") { panel.pendingCountForTest() == 3 }
+    assertTrue(indexOf(panel, "fold0") > 0)
+
+    panel.toggleGroupForTest(Status.PENDING)
+    assertEquals(-1, indexOf(panel, "fold0"))
+
+    store.updateStatus("fold2", Status.ACKNOWLEDGED)
+    waitFor("panel reflects the status change") { panel.pendingCountForTest() == 2 }
+
+    assertTrue(headers(panel).first { it.status == Status.PENDING }.collapsed)
+    assertEquals(-1, indexOf(panel, "fold0"))
   }
 
   /** A pinned file can be deleted after capture; navigating must report, not throw. */

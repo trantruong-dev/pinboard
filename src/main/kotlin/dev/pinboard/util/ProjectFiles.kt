@@ -27,6 +27,21 @@ object ProjectFiles {
   }
 
   /**
+   * The inverse of [resolve]: [file] as a project-relative path, or null when it is outside the
+   * project.
+   *
+   * Lets a caller holding a file compare it against many stored paths with one root lookup, instead
+   * of resolving every stored path through the VFS to compare the results.
+   */
+  fun relativePath(project: Project, file: VirtualFile): String? {
+    val root = projectRoot(project) ?: return null
+    val rootPath = root.path
+    val path = file.path
+    if (!path.startsWith(rootPath)) return null
+    return path.removePrefix(rootPath).removePrefix("/").takeIf { it.isNotEmpty() }
+  }
+
+  /**
    * Project root as a VFS directory. `Project.getBaseDir()` is deprecated, so the root is derived
    * from the absolute base path instead. Backslashes are normalised because the store always keeps
    * forward slashes, including on Windows.

@@ -10,35 +10,37 @@ import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.SimpleToolWindowPanel
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.wm.ToolWindow
+import com.intellij.ui.BadgeIconSupplier
 import com.intellij.ui.DoubleClickListener
 import com.intellij.ui.OnePixelSplitter
 import com.intellij.ui.PopupHandler
 import com.intellij.ui.components.JBLabel
+import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.content.Content
-import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.Alarm
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
+import dev.pinboard.mcp.StaleDetector
 import dev.pinboard.model.Feedback
 import dev.pinboard.model.Status
 import dev.pinboard.store.FeedbackListener
 import dev.pinboard.store.FeedbackStore
-import dev.pinboard.mcp.StaleDetector
+import dev.pinboard.ui.editor.FeedbackHighlighter
+import dev.pinboard.ui.theme.PinboardColors
 import java.awt.BorderLayout
 import java.awt.FlowLayout
 import java.awt.event.KeyEvent
+import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.JComponent
 import javax.swing.JPanel
 import javax.swing.KeyStroke
-import javax.swing.tree.DefaultMutableTreeNode
-import javax.swing.tree.DefaultTreeModel
-import javax.swing.tree.TreePath
-import javax.swing.tree.TreeSelectionModel
+import javax.swing.ListSelectionModel
 
 /**
- * The "Pinboard" ToolWindow content: grouped queue on top, detail below.
+ * The "Pinboard" ToolWindow content: progress ribbon, grouped queue, detail below, connection footer.
  *
  * Updates are push-based. The store publishes [FeedbackListener.TOPIC] on every mutation, whether
  * it came from the UI or from an MCP tool call, so an agent resolving an item is reflected here
@@ -48,13 +50,24 @@ class FeedbackListPanel(
   private val project: Project,
   private val content: Content,
   parentDisposable: Disposable,
+  private val toolWindow: ToolWindow? = null,
 ) : SimpleToolWindowPanel(true, true), Disposable, FeedbackListener {
 
   private val store = FeedbackStore.getInstance(project)
-  private val tree = Tree(DefaultTreeModel(DefaultMutableTreeNode("root")))
+  private val listModel = FeedbackListModel()
+  private val list = JBList(listModel).apply {
+    selectionMode = ListSelectionModel.SINGLE_SELECTION
+    cellRenderer = FeedbackCardRenderer()
+    background = PinboardColors.surface
+    // Cards already wrap to the list width, so the platform's hover popup for clipped rows would
+    // only repaint the same card overflowing past the tool window edge.
+    setExpandableItemsEnabled(false)
+  }
   private val detail: FeedbackDetailPanel
+  private val ribbon = ProgressRibbon()
   private val pendingLabel = JBLabel()
   private val connectionChip = ConnectionChip()
+  private val badge = BadgeIconSupplier(PinboardIcons.ToolWindow)
 
   /**
    * Rebuilds run on a pooled thread and are coalesced: a batch of agent updates would otherwise
@@ -76,11 +89,8 @@ class FeedbackListPanel(
     Disposer.register(parentDisposable, this)
     detail = FeedbackDetailPanel(project, this)
 
-    tree.isRootVisible = false
-    tree.showsRootHandles = true
-    tree.cellRenderer = FeedbackCellRenderer()
-    tree.selectionModel.selectionMode = TreeSelectionModel.SINGLE_TREE_SELECTION
-    tree.addTreeSelectionListener { detail.show(selectedNode()) }
+    list.addListSelectionListener { if (!it.valueIsAdjusting) detail.show(selectedNode()) }
+    installGroupFolding()
     installNavigation()
     installRowActions()
 
@@ -117,10 +127,15 @@ class FeedbackListPanel(
   }
 
   private fun buildSplitter(): JComponent {
+    val queue = JPanel(BorderLayout()).apply {
+      background = PinboardColors.surface
+      add(ribbon, BorderLayout.NORTH)
+      add(JBScrollPane(list).apply { border = JBUI.Borders.empty() }, BorderLayout.CENTER)
+    }
     // Stacked, not side by side: this tool window docks right and is usually narrow, where a
     // horizontal split leaves neither half readable.
     val splitter = OnePixelSplitter(true, 0.55f)
-    splitter.firstComponent = JBScrollPane(tree)
+    splitter.firstComponent = queue
     splitter.secondComponent = detail
     return splitter
   }
@@ -132,21 +147,36 @@ class FeedbackListPanel(
    */
   private fun buildActionGroup() = DefaultActionGroup(
     DeleteFeedbackAction(project, FeedbackSelection { selectedFeedback() }),
-    DeleteAllFeedbackAction(project),
+    ClearFeedbackActionGroup(project),
   )
 
   private fun installRowActions() {
     val group = buildActionGroup()
-    PopupHandler.installPopupMenu(tree, group, ActionPlaces.TOOLWINDOW_POPUP)
+    PopupHandler.installPopupMenu(list, group, ActionPlaces.TOOLWINDOW_POPUP)
     DeleteFeedbackAction(project, FeedbackSelection { selectedFeedback() })
-      .registerCustomShortcutSet(CommonShortcuts.getDelete(), tree, this)
+      .registerCustomShortcutSet(CommonShortcuts.getDelete(), list, this)
+  }
+
+  /**
+   * A list has no disclosure triangle of its own, so the header row is the control: clicking
+   * anywhere on it folds the group. This is the one affordance the tree used to provide for free.
+   */
+  private fun installGroupFolding() {
+    list.addMouseListener(object : MouseAdapter() {
+      override fun mouseClicked(e: MouseEvent) {
+        val index = list.locationToIndex(e.point).takeIf { it >= 0 } ?: return
+        if (!list.getCellBounds(index, index).contains(e.point)) return
+        val row = listModel.getElementAt(index) as? FeedbackRow.StatusHeader ?: return
+        listModel.toggleCollapsed(row.status)
+      }
+    })
   }
 
   private fun buildToolbar(): JComponent {
     val group = buildActionGroup()
     val actionToolbar = ActionManager.getInstance()
       .createActionToolbar(ActionPlaces.TOOLWINDOW_CONTENT, group, true)
-    actionToolbar.targetComponent = tree
+    actionToolbar.targetComponent = list
 
     // No right border: the FlowLayout below already spaces the badge from the chip.
     pendingLabel.foreground = UIUtil.getContextHelpForeground()
@@ -170,9 +200,9 @@ class FeedbackListPanel(
         FeedbackNavigator.navigate(project, feedback)
         return true
       }
-    }.installOn(tree)
+    }.installOn(list)
 
-    tree.registerKeyboardAction(
+    list.registerKeyboardAction(
       { selectedFeedback()?.let { FeedbackNavigator.navigate(project, it) } },
       KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0),
       JComponent.WHEN_FOCUSED,
@@ -184,10 +214,9 @@ class FeedbackListPanel(
     val items = store.all()
     // Staleness hits the VFS, so it is resolved once here rather than inside the cell renderer.
     val stale = items.associate { it.id to flagsFor(it) }
-    val model = FeedbackTreeModel.build(items, stale)
     val pending = items.count { it.status == Status.PENDING }
     ApplicationManager.getApplication().invokeLater(
-      { applyModel(model, pending) },
+      { applyModel(items, stale, pending) },
       ModalityState.any(),
     )
   }
@@ -197,59 +226,45 @@ class FeedbackListPanel(
     return StaleFlags(stale = result.stale, fileMissing = result.fileMissing)
   }
 
-  private fun applyModel(model: DefaultTreeModel, pending: Int) {
+  private fun applyModel(items: List<Feedback>, stale: Map<String, StaleFlags>, pending: Int) {
     if (disposed || project.isDisposed) return
     val previouslySelected = selectedFeedback()?.id
 
-    tree.model = model
-    expandDefaultGroups(model)
-    restoreSelection(model, previouslySelected)
+    listModel.setItems(items, stale)
+    restoreSelection(previouslySelected)
+    ribbon.update(items)
 
     lastPendingCount = pending
     pendingLabel.text = if (pending > 0) "Pending: $pending" else ""
     content.displayName = if (pending > 0) "Feedback ($pending)" else "Feedback"
-  }
+    // A dot on the stripe icon is the only signal that survives the tool window being collapsed.
+    toolWindow?.setIcon(badge.getWarningIcon(pending > 0))
 
-  private fun expandDefaultGroups(model: DefaultTreeModel) {
-    val root = model.root as DefaultMutableTreeNode
-    for (i in 0 until root.childCount) {
-      val groupNode = root.getChildAt(i) as DefaultMutableTreeNode
-      val group = groupNode.userObject as? StatusGroupNode ?: continue
-      if (group.status !in FeedbackTreeModel.COLLAPSED_BY_DEFAULT) {
-        tree.expandPath(TreePath(groupNode.path))
-      }
-    }
+    FeedbackHighlighter.getInstance(project).refresh()
   }
 
   /** Reselects the same item after a rebuild so an agent update does not move the user's cursor. */
-  private fun restoreSelection(model: DefaultTreeModel, feedbackId: String?) {
-    val target = feedbackId?.let { findNode(model, it) }
-    if (target == null) {
-      tree.clearSelection()
+  private fun restoreSelection(feedbackId: String?) {
+    val index = feedbackId?.let { indexOfFeedback(it) } ?: -1
+    if (index < 0) {
+      list.clearSelection()
       detail.show(null)
       return
     }
-    val path = TreePath(target.path)
-    tree.expandPath(path.parentPath)
-    tree.selectionPath = path
-    tree.scrollPathToVisible(path)
+    list.selectedIndex = index
+    list.ensureIndexIsVisible(index)
   }
 
-  private fun findNode(model: DefaultTreeModel, feedbackId: String): DefaultMutableTreeNode? {
-    val root = model.root as DefaultMutableTreeNode
-    for (i in 0 until root.childCount) {
-      val groupNode = root.getChildAt(i) as DefaultMutableTreeNode
-      for (j in 0 until groupNode.childCount) {
-        val itemNode = groupNode.getChildAt(j) as DefaultMutableTreeNode
-        val item = itemNode.userObject as? FeedbackItemNode ?: continue
-        if (item.feedback.id == feedbackId) return itemNode
-      }
+  private fun indexOfFeedback(feedbackId: String): Int {
+    for (i in 0 until listModel.size) {
+      val row = listModel.getElementAt(i)
+      if (row is FeedbackRow.Item && row.node.feedback.id == feedbackId) return i
     }
-    return null
+    return -1
   }
 
   private fun selectedNode(): FeedbackItemNode? =
-    (tree.lastSelectedPathComponent as? DefaultMutableTreeNode)?.userObject as? FeedbackItemNode
+    (list.selectedValue as? FeedbackRow.Item)?.node
 
   private fun selectedFeedback(): Feedback? = selectedNode()?.feedback
 
@@ -261,8 +276,11 @@ class FeedbackListPanel(
   /** Test hook: pending count last rendered into the badge. */
   fun pendingCountForTest(): Int = lastPendingCount
 
-  /** Test hook: exposes the tree so tests can assert structure and selection. */
-  fun treeForTest(): Tree = tree
+  /** Test hook: exposes the list so tests can assert row structure and selection. */
+  fun listForTest(): JBList<FeedbackRow> = list
+
+  /** Test hook: folds a group the way clicking its header does. */
+  fun toggleGroupForTest(status: Status) = listModel.toggleCollapsed(status)
 
   override fun dispose() {
     disposed = true

@@ -85,7 +85,7 @@ class FeedbackDetailPanel(
         "${feedback.filePath}:${feedback.startLine}-${feedback.endLine}"
       else -> "${feedback.filePath}:${feedback.startLine}"
     }
-    val status = FeedbackTreeModel.label(feedback.status)
+    val status = StatusAppearance.label(feedback.status)
     val created = DateFormatUtil.formatPrettyDateTime(feedback.createdAt)
     return htmlBlock(
       "<b>${escape(location)}</b><br/>${escape(status)} &middot; ${escape(created)}",
