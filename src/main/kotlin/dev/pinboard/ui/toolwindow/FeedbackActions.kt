@@ -101,18 +101,16 @@ private class ClearByStatusAction(
   override fun getActionUpdateThread() = ActionUpdateThread.EDT
 
   override fun update(e: AnActionEvent) {
-    val count = matching().size
+    val count = FeedbackStore.getInstance(project).countByStatus(status)
     e.presentation.text = "Clear ${status.name.lowercase()} ($count)"
     e.presentation.isEnabled = count > 0
   }
 
   override fun actionPerformed(e: AnActionEvent) {
-    val store = FeedbackStore.getInstance(project)
-    matching().forEach { store.delete(it.id) }
+    // One write, not one per item: clearing a long history item by item rewrites the store file
+    // once for each one.
+    FeedbackStore.getInstance(project).deleteByStatus(status)
   }
-
-  private fun matching(): List<Feedback> =
-    FeedbackStore.getInstance(project).all().filter { it.status == status }
 }
 
 /** Clears the whole queue. Confirmed because it is not undoable. */

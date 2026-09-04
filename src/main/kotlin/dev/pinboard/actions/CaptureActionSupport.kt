@@ -35,9 +35,21 @@ object CaptureActionSupport {
     scope: Scope,
     capture: () -> SelectionSnapshot?,
   ) = collect(project, capture) { snapshot, store ->
-    InlineFeedbackPopup.show(editor, snapshot) { note ->
-      val feedback = store.add(build(scope, note, snapshot))
-      anchor(project, editor.document, feedback)
+    // Anchor before the balloon opens, not after it is submitted.
+    //
+    // The balloon is deliberately non-modal - the editor stays live so the code being pinned can be
+    // re-read while writing the note. That means the file can change under it, and by submit time
+    // the snapshot's line numbers may point at different code. Creating the marker now ties the pin
+    // to the text the snapshot actually describes; the write-back then corrects the stored lines.
+    val id = Ulid.generate()
+    anchor(project, editor.document, id, snapshot)
+
+    InlineFeedbackPopup.show(
+      editor,
+      snapshot,
+      onCancel = { AnchorRegistry.getInstance(project).release(id) },
+    ) { note ->
+      store.add(build(id, scope, note, snapshot))
     }
   }
 
@@ -56,7 +68,7 @@ object CaptureActionSupport {
     val dialog = FeedbackInputDialog(project, snapshot)
     if (dialog.showAndGet()) {
       val note = dialog.note.trim()
-      if (note.isNotEmpty()) store.add(build(scope, note, snapshot))
+      if (note.isNotEmpty()) store.add(build(Ulid.generate(), scope, note, snapshot))
     }
   }
 
@@ -85,23 +97,22 @@ object CaptureActionSupport {
   }
 
   /**
-   * Anchors the item the moment it exists.
+   * Anchors an id at the range the snapshot describes.
    *
    * This is the one point where the exact range is known, so nothing has to be searched for: the
-   * document is open, the offsets are the ones the user selected, and the item finally has an id.
-   * Re-anchoring later goes through [dev.pinboard.capture.AnchorRegistry.ensureAnchored], which has
-   * to find the snippet again and can legitimately fail.
+   * document is open and the offsets are the ones the user selected. Re-anchoring later goes through
+   * [AnchorRegistry.ensureAnchored], which has to find the snippet again and can legitimately fail.
    */
-  private fun anchor(project: Project, document: Document, feedback: Feedback) {
-    val startLine = feedback.startLine ?: return
-    val endLine = feedback.endLine ?: return
-    AnchorRegistry.getInstance(project).anchorAt(feedback.id, document, startLine, endLine)
+  private fun anchor(project: Project, document: Document, id: String, snapshot: SelectionSnapshot?) {
+    val startLine = snapshot?.startLine ?: return
+    val endLine = snapshot.endLine ?: return
+    AnchorRegistry.getInstance(project).anchorAt(id, document, startLine, endLine)
   }
 
-  private fun build(scope: Scope, note: String, snapshot: SelectionSnapshot?): Feedback {
+  private fun build(id: String, scope: Scope, note: String, snapshot: SelectionSnapshot?): Feedback {
     val now = System.currentTimeMillis()
     return Feedback(
-      id = Ulid.generate(),
+      id = id,
       status = Status.PENDING,
       scope = scope,
       note = note,

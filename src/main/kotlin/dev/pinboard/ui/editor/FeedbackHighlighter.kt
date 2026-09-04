@@ -6,6 +6,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.editor.Document
+import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.editor.markup.GutterIconRenderer
 import com.intellij.openapi.editor.markup.HighlighterLayer
@@ -22,7 +23,6 @@ import dev.pinboard.model.Feedback
 import dev.pinboard.store.FeedbackStore
 import dev.pinboard.ui.theme.PinboardColors
 import dev.pinboard.ui.toolwindow.StatusAppearance
-import dev.pinboard.util.FilePaths
 import dev.pinboard.util.ProjectFiles
 import javax.swing.Icon
 
@@ -39,7 +39,14 @@ import javax.swing.Icon
 @Service(Service.Level.PROJECT)
 class FeedbackHighlighter(private val project: Project) : Disposable {
 
-  private val installed = mutableMapOf<Document, MutableList<RangeHighlighter>>()
+  /**
+   * Keyed by editor, not by document.
+   *
+   * Highlighters are added to an editor's own markup model, and one file open in a split has
+   * two editors sharing a document. Keyed by document, the second editor's pass would clear
+   * the highlighters the first had just been given, and only the last editor would show them.
+   */
+  private val installed = mutableMapOf<Editor, MutableList<RangeHighlighter>>()
 
   fun refresh() {
     if (project.isDisposed) return
@@ -47,15 +54,20 @@ class FeedbackHighlighter(private val project: Project) : Disposable {
 
     val byFile = openItemsByFile()
     val documentManager = FileDocumentManager.getInstance()
+    val editors = EditorFactory.getInstance().allEditors.filter { it.project === project }
 
-    for (editor in EditorFactory.getInstance().allEditors) {
-      if (editor.project !== project) continue
+    // An editor that has gone away takes its markup model with it, so its entry here is only a
+    // reference nobody can reach.
+    val live = editors.toSet()
+    installed.keys.retainAll(live)
+
+    for (editor in editors) {
       val document = editor.document
       val file = documentManager.getFile(document) ?: continue
 
       // Always clear first: an item that was resolved, deleted or relocated must not leave its old
       // decoration behind, and a stale RangeHighlighter holds a reference into the markup model.
-      installed.remove(document)?.forEach { it.dispose() }
+      installed.remove(editor)?.forEach { it.dispose() }
 
       val items = byFile[file] ?: continue
       val added = mutableListOf<RangeHighlighter>()
@@ -77,7 +89,7 @@ class FeedbackHighlighter(private val project: Project) : Disposable {
         highlighter.gutterIconRenderer = PinGutterRenderer(project, feedback)
         added += highlighter
       }
-      if (added.isNotEmpty()) installed[document] = added
+      if (added.isNotEmpty()) installed[editor] = added
     }
   }
 
@@ -161,9 +173,11 @@ class FeedbackTabColorProvider : com.intellij.openapi.fileEditor.impl.EditorTabC
 
   override fun getEditorTabColor(project: Project, file: VirtualFile): java.awt.Color? {
     val relativePath = ProjectFiles.relativePath(project, file) ?: return null
-    val hasOpen = FeedbackStore.getInstance(project).all().any {
-      StatusAppearance.isOpen(it.status) && it.filePath?.let(FilePaths::canonical) == relativePath
-    }
+    // Stored paths are canonicalised on write and migrated on load, so they can be compared as
+    // they are. This runs for every tab on every tab-strip repaint, so it must not sort the
+    // queue or allocate per item.
+    val hasOpen = FeedbackStore.getInstance(project)
+      .hasOpenItemFor(relativePath, StatusAppearance::isOpen)
     return if (hasOpen) ColorUtil.withAlpha(PinboardColors.statusPending, 0.10) else null
   }
 }

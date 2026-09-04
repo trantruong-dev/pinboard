@@ -2,6 +2,8 @@ package dev.pinboard.ui.dialog
 
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.ui.popup.JBPopupFactory
+import com.intellij.openapi.ui.popup.JBPopupListener
+import com.intellij.openapi.ui.popup.LightweightWindowEvent
 import com.intellij.ui.components.JBLabel
 import com.intellij.util.ui.JBFont
 import com.intellij.util.ui.JBUI
@@ -30,10 +32,18 @@ import javax.swing.KeyStroke
 object InlineFeedbackPopup {
 
   /**
-   * Shows the balloon for [snapshot] over [editor]. [onSubmit] receives the trimmed note and is
-   * never called with a blank one.
+   * Shows the balloon for [snapshot] over [editor].
+   *
+   * [onSubmit] receives the trimmed note and is never called with a blank one. Exactly one of
+   * [onSubmit] and [onCancel] runs, so the caller can set things up before the balloon opens and
+   * still be told to undo them.
    */
-  fun show(editor: Editor, snapshot: SelectionSnapshot?, onSubmit: (String) -> Unit) {
+  fun show(
+    editor: Editor,
+    snapshot: SelectionSnapshot?,
+    onCancel: () -> Unit = {},
+    onSubmit: (String) -> Unit,
+  ) {
     val form = FeedbackForm(snapshot, showLocation = false)
     val submit = JButton("Add")
     val content = JPanel(BorderLayout()).apply {
@@ -56,13 +66,24 @@ object InlineFeedbackPopup {
       .setCancelOnClickOutside(false)
       .createPopup()
 
+    var submitted = false
     val commit = {
       if (form.hasNote()) {
         val note = form.note()
+        submitted = true
         popup.closeOk(null)
         onSubmit(note)
       }
     }
+    // Esc, or any other dismissal. Without this the caller's setup outlives a balloon the user
+    // decided against.
+    popup.addListener(
+      object : JBPopupListener {
+        override fun onClosed(event: LightweightWindowEvent) {
+          if (!submitted) onCancel()
+        }
+      },
+    )
     submit.addActionListener { commit() }
     bindSubmitShortcut(form.noteArea, commit)
     wireEnablement(form, submit)

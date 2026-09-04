@@ -259,4 +259,105 @@ class AnchorRegistryTest : BasePlatformTestCase() {
     assertEquals(2, store.byId("multi")!!.startLine)
     assertEquals(3, store.byId("multi")!!.endLine)
   }
+
+  /**
+   * The offset/line round trip has to survive a pin whose last line is blank.
+   *
+   * An empty line's start and end offsets are the same value, so the rule that stops a pin gaining
+   * a line - "a range ending at a line start does not cover that line" - fires on it and takes the
+   * line away instead. The stored range then describes less code than the user selected, and that
+   * shorter range is what gets written to disk and handed to the agent.
+   */
+  fun testAPinEndingOnABlankLineKeepsThatLine() {
+    val document = documentFor("src/anchors/Blank.kt", "val a = 1\n\nval c = 3\n")
+    pin("blank", "src/anchors/Blank.kt", 1, 2, "val a = 1\n")
+    registry.anchorAt("blank", document, 1, 2)
+
+    assertEquals(1 to 2, registry.lineRange("blank"))
+
+    registry.syncToStore()
+    assertEquals(1, store.byId("blank")!!.startLine)
+    assertEquals(2, store.byId("blank")!!.endLine)
+  }
+
+  /** A pin on the last line of a file with no trailing newline must round trip too. */
+  fun testAPinAtTheEndOfAFileWithNoTrailingNewlineRoundTrips() {
+    val document = documentFor("src/anchors/NoEol.kt", "val a = 1\nval last = 2")
+    pin("noeol", "src/anchors/NoEol.kt", 2, 2, "val last = 2")
+    registry.anchorAt("noeol", document, 2, 2)
+
+    assertEquals(2 to 2, registry.lineRange("noeol"))
+  }
+
+  fun testASingleLineDocumentRoundTrips() {
+    val document = documentFor("src/anchors/One.kt", "val only = 1")
+    pin("one", "src/anchors/One.kt", 1, 1, "val only = 1")
+    registry.anchorAt("one", document, 1, 1)
+
+    assertEquals(1 to 1, registry.lineRange("one"))
+  }
+
+  /**
+   * Re-anchoring searches for the captured snippet, which is widened to whole lines and so usually
+   * ends with a newline. Searching for that newline puts the marker's end on the next line's start,
+   * which is a different range from the one [AnchorRegistry.anchorAt] builds for the same lines.
+   */
+  fun testReAnchoringLandsOnTheSameRangeAsTheOriginalCapture() {
+    val document = documentFor("src/anchors/Same.kt", "val a = 1\nval target = 2\nval c = 3\n")
+    pin("same", "src/anchors/Same.kt", 2, 2, "val target = 2\n")
+
+    registry.anchorAt("same", document, 2, 2)
+    val fromCapture = registry.lineRange("same")
+    registry.release("same")
+
+    registry.ensureAnchored(document)
+    assertEquals(fromCapture, registry.lineRange("same"))
+  }
+
+  /**
+   * The balloon anchors before it opens so the pin cannot drift while the note is typed, which
+   * means a cancelled balloon leaves a marker for an item that will never exist.
+   */
+  fun testReleaseForgetsAnAnchorForAnItemThatWasNeverCreated() {
+    val document = documentFor("src/anchors/Cancelled.kt", "val a = 1\nval b = 2\n")
+    registry.anchorAt("cancelled", document, 2, 2)
+    assertTrue(registry.isAnchored("cancelled"))
+
+    registry.release("cancelled")
+
+    assertFalse(registry.isAnchored("cancelled"))
+    assertNull(registry.lineRange("cancelled"))
+  }
+
+  /**
+   * One edit above a file's pins moves all of them. Writing them back one at a time publishes, and
+   * rewrites the whole store file, once per pin.
+   */
+  fun testOneEditMovesEveryPinInASingleStoreWrite() {
+    val document = documentFor(
+      "src/anchors/Many.kt",
+      (1..5).joinToString("\n") { "val v$it = $it" } + "\n",
+    )
+    repeat(5) { pin("many$it", "src/anchors/Many.kt", it + 1, it + 1, "val v${it + 1} = ${it + 1}") }
+    repeat(5) { registry.anchorAt("many$it", document, it + 1, it + 1) }
+
+    var publishes = 0
+    val connection = project.messageBus.connect(testRootDisposable)
+    connection.subscribe(
+      dev.pinboard.store.FeedbackListener.TOPIC,
+      object : dev.pinboard.store.FeedbackListener {
+        override fun onChanged() {
+          publishes++
+        }
+      },
+    )
+
+    edit(document) { it.insertString(0, "val inserted = 0\n") }
+    registry.syncToStore()
+
+    assertEquals("all five pins moved down one line", 5, (0 until 5).count {
+      store.byId("many$it")!!.startLine == it + 2
+    })
+    assertEquals("the whole batch is one store write", 1, publishes)
+  }
 }

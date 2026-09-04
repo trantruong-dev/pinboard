@@ -37,8 +37,11 @@ object ProjectFiles {
     val root = projectRoot(project) ?: return null
     val rootPath = root.path
     val path = file.path
-    if (!path.startsWith(rootPath)) return null
-    return path.removePrefix(rootPath).removePrefix("/").takeIf { it.isNotEmpty() }
+    // The separator has to be part of the test. A plain prefix check accepts a sibling whose
+    // name merely starts with the root's - /w/proj2 against root /w/proj - and would report it
+    // as living inside the project.
+    if (!path.startsWith("$rootPath/")) return null
+    return path.removePrefix("$rootPath/").takeIf { it.isNotEmpty() }
   }
 
   /**

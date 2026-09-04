@@ -51,4 +51,26 @@ class ProjectFilesTest : BasePlatformTestCase() {
     val root = ProjectFiles.projectRoot(project)!!
     assertNull(ProjectFiles.relativePath(project, root))
   }
+
+  /**
+   * A sibling directory whose name merely starts with the project's is not inside the project.
+   *
+   * A plain prefix test accepts `/w/proj2/src/Foo.kt` against root `/w/proj` and hands back
+   * `2/src/Foo.kt`, which would then be compared against stored paths as if the file were ours.
+   */
+  fun testASiblingDirectoryWithASharedPrefixIsOutsideTheProject() {
+    val root = Path.of(project.basePath!!)
+    val sibling = root.resolveSibling(root.fileName.toString() + "2")
+    val intruder = sibling.resolve("src/Foo.kt")
+    Files.createDirectories(intruder.parent)
+    Files.writeString(intruder, "content")
+    try {
+      val file = LocalFileSystem.getInstance().refreshAndFindFileByPath(intruder.toString())!!
+      assertNull(ProjectFiles.relativePath(project, file))
+    } finally {
+      Files.deleteIfExists(intruder)
+      Files.deleteIfExists(intruder.parent)
+      Files.deleteIfExists(sibling)
+    }
+  }
 }

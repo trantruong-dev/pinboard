@@ -93,9 +93,13 @@ class FeedbackListModel : AbstractListModel<FeedbackRow>() {
       }
     }
 
+    // Empty the model before announcing the removal, and only then install the new rows. A
+    // listener that reads the model during the removal event must not be shown the new size
+    // over the old indices.
     val oldSize = rows.size
-    rows = newRows
+    rows = emptyList()
     if (oldSize > 0) fireIntervalRemoved(this, 0, oldSize - 1)
+    rows = newRows
     if (rows.isNotEmpty()) fireIntervalAdded(this, 0, rows.size - 1)
   }
 

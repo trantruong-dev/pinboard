@@ -3,12 +3,15 @@ package dev.pinboard.capture
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.components.Service
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.RangeMarker
 import com.intellij.openapi.editor.event.DocumentEvent
 import com.intellij.openapi.editor.event.DocumentListener
 import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Disposer
 import com.intellij.util.Alarm
 import dev.pinboard.model.Feedback
 import dev.pinboard.model.Scope
@@ -33,7 +36,15 @@ class AnchorRegistry(private val project: Project) : Disposable {
 
   private val lock = Any()
   private val markers = mutableMapOf<String, RangeMarker>()
-  private val watched = mutableSetOf<Document>()
+
+  /**
+   * One listener per document, disposed when that document's last marker goes.
+   *
+   * Without the removal half, a document stays referenced - by its listener and by this map - for
+   * the project's whole life, which keeps its text and marker tree resident long after the file was
+   * closed and every pin in it deleted.
+   */
+  private val watchers = mutableMapOf<Document, Disposable>()
 
   /**
    * Edits arrive on the EDT inside a write action, where the store must not be touched - publishing
@@ -73,7 +84,10 @@ class AnchorRegistry(private val project: Project) : Disposable {
         if (FilePaths.canonical(feedback.filePath!!) != relativePath) continue
         if (isAnchored(feedback.id)) continue
 
-        val snippet = feedback.codeSnapshot ?: continue
+        // Captures are widened to whole lines, so a snippet usually ends with a newline. Searching
+        // for it including that newline would put the marker's end on the next line's start offset,
+        // which is a different range from the one anchorAt builds for the same lines.
+        val snippet = feedback.codeSnapshot?.trimEnd('\n', '\r')?.takeIf { it.isNotEmpty() } ?: continue
         val at = soleOccurrenceOf(text, snippet) ?: continue
         put(feedback.id, document.createRangeMarker(at, at + snippet.length))
         anchoredAny = true
@@ -102,12 +116,26 @@ class AnchorRegistry(private val project: Project) : Disposable {
    *
    * This is what makes the drift survive: the marker is runtime-only, so unless its position reaches
    * the store it is lost the moment the IDE closes.
+   *
+   * The whole batch goes through the store in one call. One edit above a file's pins moves all of
+   * them at once, and updating them one at a time would publish, and rewrite the store file, once
+   * per pin.
    */
   fun syncToStore() {
     if (project.isDisposed) return
-    val store = FeedbackStore.getInstance(project)
+    val store = try {
+      FeedbackStore.getInstance(project)
+    } catch (e: ProcessCanceledException) {
+      throw e
+    } catch (e: Exception) {
+      // The project can be disposed between the check above and this lookup.
+      LOG.debug("Store unavailable while syncing anchors", e)
+      return
+    }
+
     val live = synchronized(lock) { markers.toMap() }
-    val known = store.all().associateBy { it.id }
+    val known = store.all().mapTo(mutableSetOf()) { it.id }
+    val moved = mutableMapOf<String, Pair<Int, Int>>()
 
     for ((id, marker) in live) {
       if (id !in known) {
@@ -123,9 +151,19 @@ class AnchorRegistry(private val project: Project) : Disposable {
         drop(id)
         continue
       }
-      store.updateLocation(id, lines.first, lines.second)
+      moved[id] = lines
     }
+    if (moved.isNotEmpty()) store.updateLocations(moved)
   }
+
+  /**
+   * Forgets [feedbackId]'s anchor.
+   *
+   * Needed because an anchor can be created before the item is: the capture balloon anchors up
+   * front so the pin cannot drift while the note is being typed, and a cancelled balloon has to
+   * take its marker back with it.
+   */
+  fun release(feedbackId: String) = drop(feedbackId)
 
   /** True when [feedbackId] currently has a marker the platform still considers valid. */
   fun isAnchored(feedbackId: String): Boolean =
@@ -151,34 +189,75 @@ class AnchorRegistry(private val project: Project) : Disposable {
   }
 
   private fun put(feedbackId: String, marker: RangeMarker) {
-    synchronized(lock) { markers.put(feedbackId, marker) }?.dispose()
+    val replaced = synchronized(lock) { markers.put(feedbackId, marker) }
+    replaced?.let { retire(it) }
   }
 
   private fun drop(feedbackId: String) {
-    synchronized(lock) { markers.remove(feedbackId) }?.dispose()
+    val removed = synchronized(lock) { markers.remove(feedbackId) } ?: return
+    retire(removed)
+  }
+
+  /**
+   * Disposes a marker and stops watching its document once nothing else is anchored there.
+   *
+   * The document is read before the marker is disposed: a disposed marker is not required to still
+   * know where it lived.
+   */
+  private fun retire(marker: RangeMarker) {
+    val document = try {
+      marker.document
+    } catch (e: ProcessCanceledException) {
+      throw e
+    } catch (e: Exception) {
+      null
+    }
+    marker.dispose()
+    if (document == null) return
+
+    val watcher = synchronized(lock) {
+      if (markers.values.any { it.document === document }) null else watchers.remove(document)
+    }
+    watcher?.let { Disposer.dispose(it) }
   }
 
   /**
    * Starts listening to [document] once, so edits eventually reach the store.
    *
-   * The listener is registered against this service, so it goes away with the project rather than
-   * outliving it and holding the document alive.
+   * The listener hangs off a per-document [Disposable] registered under this service, so it goes
+   * away either with the project or with the document's last marker, whichever comes first.
    */
   private fun watch(document: Document) {
-    val isNew = synchronized(lock) { watched.add(document) }
-    if (!isNew) return
+    val watcher = synchronized(lock) {
+      if (document in watchers) return
+      Disposer.newDisposable("PinboardAnchorWatcher").also { watchers[document] = it }
+    }
+    Disposer.register(this, watcher)
     document.addDocumentListener(
       object : DocumentListener {
         override fun documentChanged(event: DocumentEvent) = scheduleSync()
       },
-      this,
+      watcher,
     )
   }
 
   private fun scheduleSync() {
     if (project.isDisposed) return
     syncAlarm.cancelAllRequests()
-    syncAlarm.addRequest({ syncToStore() }, SYNC_DELAY_MS)
+    syncAlarm.addRequest(
+      {
+        // The alarm fires on a pooled thread long after the edit. The project can be gone by then,
+        // and an unguarded throw here surfaces as an IDE internal error rather than a no-op.
+        try {
+          syncToStore()
+        } catch (e: ProcessCanceledException) {
+          throw e
+        } catch (e: Exception) {
+          LOG.debug("Deferred anchor sync failed", e)
+        }
+      },
+      SYNC_DELAY_MS,
+    )
   }
 
   /** Stored lines are 1-based inclusive; document lines are 0-based. Everything is clamped. */
@@ -192,15 +271,19 @@ class AnchorRegistry(private val project: Project) : Disposable {
   /**
    * The inverse of [offsetsFor].
    *
-   * A range ending exactly on a line start covers no text on that line - the capture side widens
-   * selections to whole lines the same way, so the two conventions have to agree or a pin would
-   * gain a line every time it round-trips.
+   * A range ending exactly at the start of a non-empty line covers no text on that line, so that
+   * line does not belong to the pin - otherwise a pin would gain a line every time it round-trips.
+   * An empty line is excluded from that rule because its start and end offsets are the same value,
+   * which would make the last line of a pin ending on a blank line disappear instead.
    */
   private fun linesFor(document: Document, startOffset: Int, endOffset: Int): Pair<Int, Int> {
     val start = document.getLineNumber(startOffset.coerceIn(0, document.textLength))
     val clampedEnd = endOffset.coerceIn(startOffset, document.textLength)
     var end = document.getLineNumber(clampedEnd)
-    if (clampedEnd > startOffset && end > start && clampedEnd == document.getLineStartOffset(end)) {
+    val endLineIsEmpty = document.getLineStartOffset(end) == document.getLineEndOffset(end)
+    if (clampedEnd > startOffset && end > start && !endLineIsEmpty &&
+      clampedEnd == document.getLineStartOffset(end)
+    ) {
       end -= 1
     }
     return (start + 1) to (end + 1)
@@ -210,12 +293,13 @@ class AnchorRegistry(private val project: Project) : Disposable {
     synchronized(lock) {
       markers.values.forEach { it.dispose() }
       markers.clear()
-      watched.clear()
+      watchers.clear()
     }
   }
 
   companion object {
     private const val SYNC_DELAY_MS = 400
+    private val LOG = Logger.getInstance(AnchorRegistry::class.java)
 
     fun getInstance(project: Project): AnchorRegistry =
       project.getService(AnchorRegistry::class.java)

@@ -120,7 +120,7 @@ class FeedbackCardRenderer : ListCellRenderer<FeedbackRow> {
     feedback.codeSnapshot?.firstMeaningfulLine()?.let { snippet ->
       panel.add(Box.createVerticalStrut(JBUI.scale(4)))
       panel.add(
-        JBLabel(truncate(snippet, SNIPPET_CHARS)).apply {
+        JBLabel(escaped(truncate(snippet, SNIPPET_CHARS))).apply {
           // Editor font: this is code, and setting it apart from the note is what makes a glance
           // enough to tell which is which.
           font = editorFont()
@@ -140,10 +140,12 @@ class FeedbackCardRenderer : ListCellRenderer<FeedbackRow> {
     )
 
     // Rows get clipped no matter how well they wrap, so the full note and path stay reachable.
-    panel.toolTipText = buildString {
-      append(feedback.note.trim())
-      feedback.filePath?.let { append(System.lineSeparator()).append(it) }
-    }
+    panel.toolTipText = escaped(
+      buildString {
+        append(feedback.note.trim())
+        feedback.filePath?.let { append(System.lineSeparator()).append(it) }
+      },
+    )
     return panel
   }
 
@@ -178,9 +180,15 @@ class FeedbackCardRenderer : ListCellRenderer<FeedbackRow> {
   private fun wrapped(note: String, widthPx: Int): String {
     val collapsed = note.trim().replace(WHITESPACE, " ")
     val clipped = truncate(collapsed, NOTE_CHARS)
-    val escaped = clipped.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    return "<html><body style='width:${widthPx}px'>$escaped</body></html>"
+    return "<html><body style='width:${widthPx}px'>${escaped(clipped)}</body></html>"
   }
+
+  /**
+   * Swing renders any label or tooltip whose text starts with `<html>` as markup, so pinning the
+   * top of an HTML file would render the user's own code instead of showing it.
+   */
+  private fun escaped(text: String): String =
+    text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
   private fun truncate(text: String, max: Int): String =
     if (text.length <= max) text else text.take(max - 1) + "…"
