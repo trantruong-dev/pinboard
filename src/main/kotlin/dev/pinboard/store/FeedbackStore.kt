@@ -87,6 +87,26 @@ class FeedbackStore(private val project: Project) : Disposable {
     }
   }
 
+  /**
+   * Moves an item to a new line range, or does nothing if it is already there.
+   *
+   * This is how the runtime anchoring in [dev.pinboard.capture.AnchorRegistry] becomes durable: a
+   * marker dies with the document, so unless its position lands here it is lost on close. The
+   * no-op-when-unchanged part is load-bearing - a sync that always marked the store dirty would
+   * schedule a flush, which syncs again, forever.
+   */
+  fun updateLocation(id: String, startLine: Int, endLine: Int): Feedback? {
+    lock.withLock {
+      val current = items[id] ?: return null
+      if (current.startLine == startLine && current.endLine == endLine) return current
+      val updated = current.copy(startLine = startLine, endLine = endLine)
+      items[id] = updated
+      scheduleFlushLocked()
+      publishLocked()
+      return updated
+    }
+  }
+
   fun delete(id: String): Boolean {
     lock.withLock {
       if (items.remove(id) == null) return false
@@ -159,6 +179,7 @@ class FeedbackStore(private val project: Project) : Disposable {
 
   private fun flush() {
     if (disposed) return
+    syncAnchorsBeforeWriting()
     // Snapshot the memory state under lock. We do NOT clear dirty here: a failed write must
     // leave dirty set so a later flush (or dispose) retries.
     val snapshot = lock.withLock { items.values.toList() }
@@ -189,6 +210,22 @@ class FeedbackStore(private val project: Project) : Disposable {
     }
   }
 
+  /**
+   * Folds any live anchoring back in, so what reaches disk is where the code is now rather than
+   * where it was when it was pinned.
+   *
+   * Runs before the lock is taken: the write-back goes through [updateLocation], which takes the
+   * same lock itself. Anchoring is an optimisation, so a failure here must never stop a write.
+   */
+  private fun syncAnchorsBeforeWriting() {
+    if (project.isDisposed) return
+    try {
+      dev.pinboard.capture.AnchorRegistry.getInstance(project).syncToStore()
+    } catch (e: Exception) {
+      LOG.debug("Anchor sync before flush failed", e)
+    }
+  }
+
   private fun publishLocked() {
     if (disposed) return
     project.messageBus.syncPublisher(FeedbackListener.TOPIC).onChanged()
@@ -215,6 +252,8 @@ class FeedbackStore(private val project: Project) : Disposable {
   }
 
   companion object {
+    private val LOG = com.intellij.openapi.diagnostic.Logger.getInstance(FeedbackStore::class.java)
+
     fun getInstance(project: Project): FeedbackStore = project.service<FeedbackStore>()
   }
 }

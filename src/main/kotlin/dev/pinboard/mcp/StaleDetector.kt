@@ -2,6 +2,7 @@ package dev.pinboard.mcp
 
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.project.Project
+import dev.pinboard.capture.AnchorRegistry
 import dev.pinboard.model.Feedback
 import dev.pinboard.model.Scope
 import dev.pinboard.util.ProjectFiles
@@ -22,9 +23,15 @@ object StaleDetector {
   fun check(project: Project, feedback: Feedback): StaleResult {
     if (feedback.scope != Scope.SELECTION) return StaleResult(stale = false, fileMissing = false)
     val filePath = feedback.filePath ?: return StaleResult(false, false)
-    val startLine = feedback.startLine ?: return StaleResult(false, false)
-    val endLine = feedback.endLine ?: return StaleResult(false, false)
     val expectedSha = feedback.contentSha256 ?: return StaleResult(false, false)
+
+    // A live anchor knows where the code moved to; the stored lines only know where it used to be.
+    // Without this, inserting a line above a pin reports it stale even though its code is untouched.
+    // No anchor - after a restart, or a file that was never opened - and this is the original path,
+    // unchanged.
+    val anchored = AnchorRegistry.getInstance(project).lineRange(feedback.id)
+    val startLine = anchored?.first ?: feedback.startLine ?: return StaleResult(false, false)
+    val endLine = anchored?.second ?: feedback.endLine ?: return StaleResult(false, false)
 
     return ReadAction.compute<StaleResult, Throwable> {
       try {

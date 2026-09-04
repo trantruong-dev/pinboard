@@ -2,8 +2,10 @@ package dev.pinboard.actions
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
+import dev.pinboard.capture.AnchorRegistry
 import dev.pinboard.capture.SelectionSnapshot
 import dev.pinboard.model.Feedback
 import dev.pinboard.model.Scope
@@ -34,7 +36,8 @@ object CaptureActionSupport {
     capture: () -> SelectionSnapshot?,
   ) = collect(project, capture) { snapshot, store ->
     InlineFeedbackPopup.show(editor, snapshot) { note ->
-      store.add(build(scope, note, snapshot))
+      val feedback = store.add(build(scope, note, snapshot))
+      anchor(project, editor.document, feedback)
     }
   }
 
@@ -79,6 +82,20 @@ object CaptureActionSupport {
         ask(snapshot, store)
       }
     }
+  }
+
+  /**
+   * Anchors the item the moment it exists.
+   *
+   * This is the one point where the exact range is known, so nothing has to be searched for: the
+   * document is open, the offsets are the ones the user selected, and the item finally has an id.
+   * Re-anchoring later goes through [dev.pinboard.capture.AnchorRegistry.ensureAnchored], which has
+   * to find the snippet again and can legitimately fail.
+   */
+  private fun anchor(project: Project, document: Document, feedback: Feedback) {
+    val startLine = feedback.startLine ?: return
+    val endLine = feedback.endLine ?: return
+    AnchorRegistry.getInstance(project).anchorAt(feedback.id, document, startLine, endLine)
   }
 
   private fun build(scope: Scope, note: String, snapshot: SelectionSnapshot?): Feedback {

@@ -10,6 +10,7 @@ import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
+import dev.pinboard.capture.AnchorRegistry
 import dev.pinboard.model.Feedback
 import dev.pinboard.model.Scope
 import dev.pinboard.model.Status
@@ -38,7 +39,10 @@ object FeedbackNavigator {
       notifyMissing(project, relativePath)
       return
     }
-    val line = ((feedback.startLine ?: 1) - 1).coerceAtLeast(0)
+    // Prefer where the code is now over where it was pinned, so a jump after an edit above
+    // the pin still lands on the right lines.
+    val anchored = AnchorRegistry.getInstance(project).lineRange(feedback.id)?.first
+    val line = ((anchored ?: feedback.startLine ?: 1) - 1).coerceAtLeast(0)
     OpenFileDescriptor(project, file, line, 0).navigate(true)
   }
 

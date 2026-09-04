@@ -17,6 +17,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.ui.ColorUtil
+import dev.pinboard.capture.AnchorRegistry
 import dev.pinboard.model.Feedback
 import dev.pinboard.store.FeedbackStore
 import dev.pinboard.ui.theme.PinboardColors
@@ -97,8 +98,11 @@ class FeedbackHighlighter(private val project: Project) : Disposable {
    * to throw inside a UI refresh.
    */
   private fun offsetsFor(document: Document, feedback: Feedback): Pair<Int, Int>? {
-    val startLine = feedback.startLine ?: return null
-    val endLine = feedback.endLine ?: startLine
+    // The anchor is where the code is now; the stored lines are where it was pinned. Painting
+    // from the stored lines would leave the tint behind after any edit above the pin.
+    val anchored = AnchorRegistry.getInstance(project).lineRange(feedback.id)
+    val startLine = anchored?.first ?: feedback.startLine ?: return null
+    val endLine = anchored?.second ?: feedback.endLine ?: startLine
     if (document.lineCount == 0) return null
     val first = (startLine - 1).coerceIn(0, document.lineCount - 1)
     val last = (endLine - 1).coerceIn(first, document.lineCount - 1)
