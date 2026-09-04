@@ -2,6 +2,19 @@ This product adapts UI patterns from Marginalia
 (https://github.com/borgand/marginalia), Copyright (c) 2026 Laas Toom,
 licensed under the MIT License.
 
-The adapted work is presentation only: the rounded status pill, and the
-connection chip with its footer status line and activity log. No Marginalia
-source file is redistributed here.
+The adapted work is presentation and interaction design only:
+
+  - the rounded status pill
+  - the connection chip with its footer status line and activity log
+  - the card queue with a status colour down each card's left edge, its
+    collapsible status headers, and the progress ribbon above it
+  - capturing a note in a balloon anchored at the caret, and the button that
+    floats over a selection
+  - marking pinned code in the editor: the line tint, the error-stripe mark,
+    the gutter pin, and the tinted editor tab
+  - anchoring a pin to a RangeMarker so it follows its code, including the
+    rule that a snippet matching in several places is refused rather than
+    guessed at
+
+Everything was rewritten against this project's own model and platform usage.
+No Marginalia source file is redistributed here.
