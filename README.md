@@ -155,7 +155,7 @@ exactly as before if you prefer them.
 Two targets take an argument:
 
 ```
-make test TEST='*.AnchorRegistryTest'   # one class, or one method
+make test TEST="*.AnchorRegistryTest"   # one class, or one method
 make verify IDE=IC-2025.3               # one IDE, as the CI matrix does
 ```
 
