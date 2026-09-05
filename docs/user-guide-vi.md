@@ -240,10 +240,15 @@ Các tool tự nó đã hiện ra cho agent thấy; phần hướng dẫn chỉ 
 Nếu agent báo không có `feedback_watch`, gần như chắc chắn là nó đang tìm đúng tên trần. Hãy bảo nó
 khớp theo phần `feedback_`.
 
-**`feedback_watch` cố ý chặn lại, và mỗi client chịu chờ một khoảng khác nhau.** Nó giữ kết nối mở cho
-đến khi có mục mới, và đó chính là thứ giúp gom lô mà không cần hỏi liên tục. IDE sẵn sàng chờ vài
-phút, nhưng MCP client thường bỏ cuộc trước và lệnh gọi bị mất. Vì vậy tham số `timeoutSeconds` mặc
-định là 60 giây. Nếu client của bạn hết giờ sớm hơn:
+**`feedback_watch` chỉ thấy những gì bạn ghim *sau* khi nó được gọi.** Nó giữ kết nối mở để chờ mục
+tiếp theo, và đó chính là thứ giúp gom lô mà không cần hỏi liên tục - nhưng những gì đã nằm sẵn trong
+hàng đợi thì nó không nhìn thấy. Agent nào mở đầu bằng `feedback_watch` sẽ ngồi im như đang rảnh
+trong khi backlog của bạn không ai đụng tới. `feedback_list` mới là lệnh đọc backlog, và đó là lý do
+skill dặn agent bắt đầu từ đó rồi mới chuyển sang `watch`.
+
+**Mỗi client cũng chịu chờ một khoảng khác nhau.** IDE sẵn sàng chờ vài phút, nhưng MCP client thường
+bỏ cuộc trước và lệnh gọi bị mất. Vì vậy tham số `timeoutSeconds` của `feedback_watch` mặc định là 60
+giây. Nếu client của bạn hết giờ sớm hơn:
 
 - giảm `timeoutSeconds` cho vừa, hoặc
 - bỏ hẳn `feedback_watch` và dùng `feedback_list`, vì lệnh này trả về ngay lập tức.
@@ -363,7 +368,7 @@ thực sự đã đến, và chỉ nói đúng chừng đó.
 | Tool | Chức năng |
 |---|---|
 | `feedback_list` | Hàng đợi hiện tại. Mặc định lấy pending và acknowledged |
-| `feedback_watch` | Chặn lại cho đến khi có mục mới, rồi trả về cả lô |
+| `feedback_watch` | Chặn lại chờ những mục được ghim *sau* lời gọi, rồi trả về cả lô |
 | `feedback_acknowledge` | Đánh dấu đã xem. Nhận cả lô trong một lần gọi |
 | `feedback_resolve` | Đóng một mục, bắt buộc kèm tóm tắt việc đã làm |
 | `feedback_dismiss` | Đóng một mục, bắt buộc kèm lý do không xử lý |
@@ -442,13 +447,15 @@ này, mỗi lúc chỉ sửa một mục từ một cửa sổ.
 2. Bạn bôi đen từng chỗ và nhấn `Ctrl+Alt+Shift+F`, mỗi lần gõ một ghi chú ngắn. Bốn thẻ xuất hiện
    dưới nhóm **Pending**. Chưa có gì được gửi đi đâu cả.
 3. Bạn bảo agent: *"xử lý hết pinboard đi"*.
-4. Agent gọi `feedback_watch`, nhận cả bốn mục trong một lô, rồi gọi `feedback_acknowledge` với cả bốn
+4. Agent gọi `feedback_list`, nhận cả bốn mục trong một lô, rồi gọi `feedback_acknowledge` với cả bốn
    id. Trong tool window, chúng chuyển sang **Acknowledged** và thanh tiến độ nhích lên.
 5. Với từng mục, agent đọc ghi chú của bạn và ảnh chụp code, thực hiện thay đổi, rồi gọi
    `feedback_resolve` kèm tóm tắt đúng những gì nó đã làm.
-6. Bạn đọc các bản tóm tắt trong khung chi tiết, ngay cạnh đoạn code đã ghim. Một mục không đúng ý
-   bạn, nên bạn ghim thêm một góp ý nữa.
-7. Khi đã hài lòng, **Clear | Clear resolved** dọn sạch phần việc đã xong.
+6. Sau đó agent gọi `feedback_watch` và nằm chờ ở đó cho những gì bạn ghim tiếp theo.
+7. Bạn đọc các bản tóm tắt trong khung chi tiết, ngay cạnh đoạn code đã ghim. Một mục không đúng ý
+   bạn, nên bạn ghim thêm một góp ý nữa - và vì agent đang nằm trong `feedback_watch`, nó tự nhận
+   mục đó luôn.
+8. Khi đã hài lòng, **Clear | Clear resolved** dọn sạch phần việc đã xong.
 
 ---
 

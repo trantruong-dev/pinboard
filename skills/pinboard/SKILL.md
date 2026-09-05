@@ -20,16 +20,20 @@ plugin is missing.
 
 ## Picking work up
 
-`feedback_watch` blocks until new items arrive, then returns them as one batch. Prefer it over
-polling. It is built to be called in a loop: it returns an empty batch when nothing arrived, and
-you call it again.
+**Start with `feedback_list`.** It returns the current queue immediately. This matters because
+`feedback_watch` only reports items pinned *after* you called it, so anything the developer pinned
+before you started is invisible to `watch` and would be missed.
+
+`feedback_watch` then blocks until something new is pinned, waits a few seconds to collect the rest
+of the cluster, and returns them as one batch. Prefer it over polling. It is built to be called in
+a loop: it returns an empty batch when nothing arrived, and you call it again.
+
+Both return `{ items, totalPending }`. **Read `totalPending` on an empty batch.** Above zero means
+there is a backlog from before your call, and `feedback_list` is what reads it.
 
 Keep `timeoutSeconds` comfortably under your own tool-call timeout. The IDE will block for
 minutes without complaint, but the MCP client gives up first and the call is lost. The default of
 60s is chosen for that reason - raise it only if you know your client allows it.
-
-`feedback_list` shows the current queue without blocking. Use it when the developer asks what is
-outstanding, or to re-read an item you already know about.
 
 By default both return **PENDING and ACKNOWLEDGED** items. Read the `status` field on each item:
 
@@ -88,9 +92,9 @@ it, or while the developer has asked you to keep watching.
 
 ## A normal loop
 
-1. `feedback_watch` - block for the batch
-2. `feedback_acknowledge` with every id in the batch
+1. `feedback_list` - read anything already waiting
+2. `feedback_acknowledge` with every id you picked up
 3. For each item: read `codeSnapshot`, check `stale` and `fileMissing`, do the work
 4. `feedback_resolve` with a real summary, or `feedback_dismiss` with a reason, or
    `feedback_reply` if you are blocked on a question
-5. Back to 1
+5. `feedback_watch` - block for the next batch, then back to 2
