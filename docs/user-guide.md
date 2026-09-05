@@ -241,10 +241,15 @@ The tools are discoverable on their own; the instructions only save you from rep
 servers. If an agent reports that `feedback_watch` does not exist, it is almost always looking for
 the bare name. Tell it to match on the `feedback_` part.
 
-**`feedback_watch` blocks on purpose, and clients disagree about how long they will wait.** It holds
-the connection open until new items arrive, which is what makes batching work without polling. The
-IDE will happily block for minutes, but your MCP client will give up first and the call is lost. Its
-`timeoutSeconds` parameter defaults to 60 seconds for that reason. If your client times out sooner:
+**`feedback_watch` only sees what you pin after it is called.** It holds the connection open waiting
+for the next pin, which is what makes batching work without polling - but anything already sitting
+in the queue is invisible to it. An agent that opens with `feedback_watch` will sit there looking
+idle while your backlog goes untouched. `feedback_list` is what reads the backlog, which is why the
+skill tells the agent to start there and only then settle into `watch`.
+
+**Clients also disagree about how long they will wait.** The IDE will happily block for minutes, but
+your MCP client will give up first and the call is lost. `feedback_watch`'s `timeoutSeconds`
+parameter defaults to 60 seconds for that reason. If your client times out sooner:
 
 - lower `timeoutSeconds` to fit, or
 - skip `feedback_watch` entirely and use `feedback_list`, which returns immediately.
@@ -366,7 +371,7 @@ arrived, and nothing more.
 | Tool | What it does |
 |---|---|
 | `feedback_list` | Current queue. Pending and acknowledged by default |
-| `feedback_watch` | Blocks until new items arrive, returns them as one batch |
+| `feedback_watch` | Blocks until items are pinned *after* the call, returns them as one batch |
 | `feedback_acknowledge` | Marks items as seen. Takes a whole batch at once |
 | `feedback_resolve` | Closes an item with a required summary of what was done |
 | `feedback_dismiss` | Closes an item with a required reason for not acting |
@@ -446,13 +451,15 @@ one window at a time.
 2. You select each one and press `Ctrl+Alt+Shift+F`, typing a short note each time. Four cards
    appear under **Pending**. Nothing has been sent anywhere.
 3. You tell your agent: *"work through the pinboard"*.
-4. The agent calls `feedback_watch`, gets all four in one batch, and calls `feedback_acknowledge`
+4. The agent calls `feedback_list`, gets all four in one batch, and calls `feedback_acknowledge`
    with all four ids. In the tool window they move to **Acknowledged** and the progress bar moves.
 5. For each item it reads your note and the code snapshot, makes the change, and calls
    `feedback_resolve` with a summary of what it actually did.
-6. You read the summaries in the detail pane, next to the code you pinned. One of them is not what
-   you meant, so you pin a follow-up.
-7. When you are satisfied, **Clear | Clear resolved** tidies the finished work away.
+6. It then calls `feedback_watch` and waits there for whatever you pin next.
+7. You read the summaries in the detail pane, next to the code you pinned. One of them is not what
+   you meant, so you pin a follow-up - and because the agent is sitting in `feedback_watch`, it
+   picks that one up on its own.
+8. When you are satisfied, **Clear | Clear resolved** tidies the finished work away.
 
 ---
 
