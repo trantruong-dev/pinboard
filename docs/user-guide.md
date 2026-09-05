@@ -105,27 +105,51 @@ It does not know that a queue exists or when to check it. That is what the skill
 the agent to pick up batches, how to read the `stale` flag, and to close every item with a summary
 you can audit.
 
-### Option A - install it with a command (recommended)
+### Option A - one command, any agent (recommended)
 
-In Claude Code, run these two commands:
+```bash
+npx skills add trantruong-dev/pinboard
+```
+
+That is the [`skills`](https://github.com/vercel-labs/skills) CLI, the installer for the open
+[Agent Skills](https://agentskills.io) ecosystem. It knows where each coding agent keeps its skills -
+Claude Code, Codex, Cursor, OpenCode, Gemini CLI, GitHub Copilot, Cline, Continue, Zed, Junie,
+Windsurf and dozens more - so it writes the skill to the right place without you looking anything up.
+It will ask which agents to install for.
+
+Useful variants:
+
+```bash
+npx skills add trantruong-dev/pinboard --list          # just show what is in there, install nothing
+npx skills add trantruong-dev/pinboard -g              # install globally, for every project
+npx skills add trantruong-dev/pinboard -g -a claude-code -y   # one agent, no prompts
+```
+
+**Scope matters.** By default it installs into the **current project** (`./.claude/skills/` and the
+equivalent for other agents), which means it is committed with your repository and your teammates get
+it too. Add `-g` to install into your home directory instead, so it applies everywhere and touches no
+repository.
+
+Nothing else to configure. The skill works the moment your agent next starts.
+
+### Option B - Claude Code plugin
+
+If you would rather manage it through Claude Code's own plugin system:
 
 ```
 /plugin marketplace add trantruong-dev/pinboard
 /plugin install pinboard@trantruong-dev
+/reload-plugins
 ```
 
-The first registers this repository as a plugin marketplace; the second installs the skill from it.
-No files to copy, and `/plugin` will offer you the update when a new version ships.
+The first line registers this repository as a plugin marketplace, the second installs the skill from
+it, and the third activates it without restarting Claude Code. `/plugin` then offers you updates when
+a new version ships.
 
-Then run `/reload-plugins`. Restarting Claude Code is not required.
-
-Notes:
-
-- `/plugin` needs a recent version of Claude Code. If the command is not recognised, use option B.
 - The marketplace is registered **per user**, so you do it once, not once per project.
-- It reads from GitHub, so it works from any machine with network access.
+- `/plugin` needs a recent version of Claude Code. If it is not recognised, use option A or C.
 
-### Option B - copy the file by hand
+### Option C - copy the file by hand
 
 Copy [`skills/pinboard/SKILL.md`](../skills/pinboard/SKILL.md) from this repository to:
 
@@ -182,8 +206,14 @@ and is offering to configure it - that is the same thing, just initiated by the 
 
 ### Step 2 - tell the client when to use the tools
 
-The skill file is plain Markdown. Everything below its `---` frontmatter is client-agnostic prose:
-copy that body into whatever file your client reads as standing instructions.
+**Try the one-liner first.** `npx skills add trantruong-dev/pinboard` from
+[section 5](#5-teaching-your-agent-when-to-use-it) is not Claude-only - it supports dozens of agents
+and writes the skill into the directory each one reads. If your agent is on its list, you are done
+and can skip the rest of this step.
+
+For an agent it does not cover, do it by hand. The skill file is plain Markdown: everything below its
+`---` frontmatter is client-agnostic prose, so copy that body into whatever file your client reads as
+standing instructions.
 
 | Client | Where its project instructions live |
 |---|---|

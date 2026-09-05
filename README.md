@@ -71,7 +71,17 @@ The tools are available as soon as the plugin is installed, but an agent will no
 for them. The skill tells it to pick up batches, how to read the `stale` flag, and to close each item
 with a summary you can audit.
 
-In Claude Code:
+One command, whichever agent you use:
+
+```bash
+npx skills add trantruong-dev/pinboard
+```
+
+That is the [`skills`](https://github.com/vercel-labs/skills) CLI. It knows where Claude Code, Codex,
+Cursor, OpenCode, Gemini CLI, Copilot, Cline, Zed, Junie, Windsurf and dozens more keep their skills,
+and writes it there. Add `-g` to install for every project rather than just this one.
+
+Through Claude Code's own plugin system instead:
 
 ```
 /plugin marketplace add trantruong-dev/pinboard
@@ -80,7 +90,7 @@ In Claude Code:
 ```
 
 Or copy [`skills/pinboard/SKILL.md`](skills/pinboard/SKILL.md) to `~/.claude/skills/pinboard/SKILL.md`
-by hand, which works on any version.
+by hand, which works anywhere.
 
 **Other agents work too.** The tools live on the IDE's MCP server, not on anything Claude-specific.
 The IDE auto-configures Claude Code, Claude Desktop, Cursor, VS Code and Windsurf; every other client

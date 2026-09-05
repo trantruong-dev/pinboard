@@ -105,28 +105,52 @@ biết là có một hàng đợi tồn tại, cũng không biết khi nào nên
 agent lấy góp ý theo lô, cách đọc cờ `stale`, và phải đóng mỗi mục bằng một bản tóm tắt mà bạn kiểm
 chứng được.
 
-### Cách A - cài bằng câu lệnh (khuyến nghị)
+### Cách A - một câu lệnh, dùng được cho mọi agent (khuyến nghị)
 
-Trong Claude Code, chạy hai lệnh sau:
+```bash
+npx skills add trantruong-dev/pinboard
+```
+
+Đây là CLI [`skills`](https://github.com/vercel-labs/skills), trình cài đặt của hệ sinh thái
+[Agent Skills](https://agentskills.io). Nó biết mỗi coding agent lưu skill ở đâu - Claude Code, Codex,
+Cursor, OpenCode, Gemini CLI, GitHub Copilot, Cline, Continue, Zed, Junie, Windsurf và vài chục cái
+khác - nên nó tự ghi skill vào đúng chỗ mà bạn không phải tra cứu gì. Lệnh sẽ hỏi bạn muốn cài cho
+những agent nào.
+
+Vài biến thể hữu ích:
+
+```bash
+npx skills add trantruong-dev/pinboard --list          # chỉ xem có gì, không cài
+npx skills add trantruong-dev/pinboard -g              # cài toàn cục, dùng cho mọi project
+npx skills add trantruong-dev/pinboard -g -a claude-code -y   # một agent, không hỏi gì
+```
+
+**Chú ý phạm vi cài.** Mặc định lệnh cài vào **project hiện tại** (`./.claude/skills/` và thư mục
+tương ứng của các agent khác), nghĩa là nó sẽ được commit cùng repository và đồng đội của bạn cũng có.
+Thêm `-g` để cài vào thư mục home, khi đó skill dùng được ở mọi nơi và không đụng vào repository nào.
+
+Không phải cấu hình gì thêm. Skill có hiệu lực ngay lần khởi động kế tiếp của agent.
+
+### Cách B - dùng plugin của Claude Code
+
+Nếu bạn muốn quản lý qua hệ thống plugin của chính Claude Code:
 
 ```
 /plugin marketplace add trantruong-dev/pinboard
 /plugin install pinboard@trantruong-dev
+/reload-plugins
 ```
 
-Lệnh đầu đăng ký repository này thành một plugin marketplace; lệnh sau cài skill từ đó. Không phải
-copy file nào, và khi có phiên bản mới thì `/plugin` sẽ đề nghị bạn cập nhật.
+Dòng đầu đăng ký repository này thành một plugin marketplace, dòng thứ hai cài skill từ đó, dòng thứ
+ba kích hoạt mà không cần khởi động lại Claude Code. Sau này có phiên bản mới thì `/plugin` sẽ đề nghị
+bạn cập nhật.
 
-Sau đó chạy `/reload-plugins`. Không cần khởi động lại Claude Code.
-
-Lưu ý:
-
-- `/plugin` cần một phiên bản Claude Code tương đối mới. Nếu lệnh không được nhận, hãy dùng cách B.
 - Marketplace được đăng ký **theo người dùng**, nên bạn chỉ làm một lần, không phải làm lại cho từng
   project.
-- Nó đọc từ GitHub, nên chạy được trên mọi máy có mạng.
+- `/plugin` cần một phiên bản Claude Code tương đối mới. Nếu lệnh không được nhận, hãy dùng cách A
+  hoặc C.
 
-### Cách B - copy file thủ công
+### Cách C - copy file thủ công
 
 Copy file [`skills/pinboard/SKILL.md`](../skills/pinboard/SKILL.md) trong repository này sang:
 
@@ -181,8 +205,14 @@ Nếu IDE hiện thông báo *"MCP clients detected"*, nghĩa là nó đã phát
 
 ### Bước 2 - bảo client khi nào cần dùng các tool
 
-File skill là Markdown thuần. Toàn bộ phần nằm dưới khối frontmatter `---` là văn bản không phụ thuộc
-client: cứ copy phần thân đó vào file mà client của bạn đọc làm hướng dẫn thường trực.
+**Thử câu lệnh một dòng trước đã.** Lệnh `npx skills add trantruong-dev/pinboard` ở
+[mục 5](#5-dạy-agent-biết-khi-nào-cần-dùng) không chỉ dành cho Claude - nó hỗ trợ hàng chục agent và tự
+ghi skill vào đúng thư mục mà từng agent đọc. Nếu agent của bạn nằm trong danh sách đó thì bạn xong
+rồi, có thể bỏ qua phần còn lại của bước này.
+
+Với agent mà nó chưa hỗ trợ thì làm thủ công. File skill là Markdown thuần: toàn bộ phần nằm dưới khối
+frontmatter `---` là văn bản không phụ thuộc client, cứ copy phần thân đó vào file mà client của bạn
+đọc làm hướng dẫn thường trực.
 
 | Client | Nơi đặt hướng dẫn cho project |
 |---|---|
