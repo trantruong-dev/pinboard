@@ -2,6 +2,8 @@ package dev.pinboard.mcp
 
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.TextRange
+import dev.pinboard.capture.AnchorRegistry
 import dev.pinboard.model.Feedback
 import dev.pinboard.model.Scope
 import dev.pinboard.util.ProjectFiles
@@ -22,9 +24,15 @@ object StaleDetector {
   fun check(project: Project, feedback: Feedback): StaleResult {
     if (feedback.scope != Scope.SELECTION) return StaleResult(stale = false, fileMissing = false)
     val filePath = feedback.filePath ?: return StaleResult(false, false)
-    val startLine = feedback.startLine ?: return StaleResult(false, false)
-    val endLine = feedback.endLine ?: return StaleResult(false, false)
     val expectedSha = feedback.contentSha256 ?: return StaleResult(false, false)
+
+    // A live anchor knows where the code moved to; the stored lines only know where it used to be.
+    // Without this, inserting a line above a pin reports it stale even though its code is untouched.
+    // No anchor - after a restart, or a file that was never opened - and this is the original path,
+    // unchanged.
+    val anchored = AnchorRegistry.getInstance(project).lineRange(feedback.id)
+    val startLine = anchored?.first ?: feedback.startLine ?: return StaleResult(false, false)
+    val endLine = anchored?.second ?: feedback.endLine ?: return StaleResult(false, false)
 
     return ReadAction.compute<StaleResult, Throwable> {
       try {
@@ -43,12 +51,15 @@ object StaleDetector {
     val document = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance().getDocument(vf)
       ?: return null
     if (startLine < 1 || endLine < startLine) return null
-    val text = document.text
-    val lines = text.split("\n")
-    if (lines.isEmpty()) return null
-    val from = (startLine - 1).coerceIn(0, lines.size - 1)
-    val to = (endLine - 1).coerceIn(from, lines.size - 1)
-    return lines.subList(from, to + 1).joinToString("\n")
+    if (document.lineCount == 0) return null
+    // Read just the range. Copying and splitting the whole document to look at one or two lines
+    // is fine once, but this runs per item per rebuild, and rebuilds now follow every edit that
+    // moves a pin.
+    val from = (startLine - 1).coerceIn(0, document.lineCount - 1)
+    val to = (endLine - 1).coerceIn(from, document.lineCount - 1)
+    return document.getText(
+      TextRange(document.getLineStartOffset(from), document.getLineEndOffset(to)),
+    )
   }
 }
 

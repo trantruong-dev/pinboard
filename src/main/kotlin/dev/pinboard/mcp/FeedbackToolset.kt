@@ -22,11 +22,19 @@ import kotlinx.coroutines.delay
  */
 class FeedbackToolset : McpToolset {
 
-  private suspend fun currentProject(): Project {
+  /**
+   * Resolves the project for this call and records that the agent reached us.
+   *
+   * Every tool goes through here, which is why the recording lives here rather than in seven call
+   * sites that would drift apart. A call arriving is the only evidence Pinboard has that an agent is
+   * connected at all - the MCP server belongs to the IDE and cannot be asked.
+   */
+  private suspend fun currentProject(tool: String): Project {
     val project = McpProjectResolver.currentProject(coroutineContext)
     if (project == null || project.isDisposed) {
       throw IllegalStateException("No active project for this feedback tool call")
     }
+    McpActivity.getInstance(project).record(tool)
     return project
   }
 
@@ -43,7 +51,7 @@ class FeedbackToolset : McpToolset {
     status: String? = null,
     limit: Int = 20,
   ): ListResult {
-    val project = currentProject()
+    val project = currentProject("feedback_list")
     val store = FeedbackStore.getInstance(project)
     val requested = status?.let { parseStatus(it) }
     val all = store.all()
@@ -65,7 +73,7 @@ class FeedbackToolset : McpToolset {
     "Accepts an array of ids to acknowledge a whole batch in one call. Unknown ids and non-PENDING " +
     "items (RESOLVED/DISMISSED) are ignored - a resolved item is never resurrected.")
   suspend fun feedback_acknowledge(ids: List<String>): BatchResult {
-    val store = FeedbackStore.getInstance(currentProject())
+    val store = FeedbackStore.getInstance(currentProject("feedback_acknowledge"))
     var affected = 0
     for (id in ids) {
       val current = store.byId(id) ?: continue
@@ -83,7 +91,7 @@ class FeedbackToolset : McpToolset {
     "The summary is stored in the thread so the human can review it.")
   suspend fun feedback_resolve(id: String, summary: String): String {
     if (summary.isBlank()) ToolResponses.error("summary is required")
-    val store = FeedbackStore.getInstance(currentProject())
+    val store = FeedbackStore.getInstance(currentProject("feedback_resolve"))
     store.byId(id) ?: ToolResponses.error("No feedback with id $id")
     store.updateStatus(id, Status.RESOLVED)
     store.appendMessage(id, Author.AGENT, summary)
@@ -94,7 +102,7 @@ class FeedbackToolset : McpToolset {
   @McpDescription("Decides not to act on a feedback item. A required reason is stored in the thread.")
   suspend fun feedback_dismiss(id: String, reason: String): String {
     if (reason.isBlank()) ToolResponses.error("reason is required")
-    val store = FeedbackStore.getInstance(currentProject())
+    val store = FeedbackStore.getInstance(currentProject("feedback_dismiss"))
     store.byId(id) ?: ToolResponses.error("No feedback with id $id")
     store.updateStatus(id, Status.DISMISSED)
     store.appendMessage(id, Author.AGENT, reason)
@@ -106,7 +114,7 @@ class FeedbackToolset : McpToolset {
     "Does not change the item's status.")
   suspend fun feedback_reply(id: String, message: String): String {
     if (message.isBlank()) ToolResponses.error("message is required")
-    val store = FeedbackStore.getInstance(currentProject())
+    val store = FeedbackStore.getInstance(currentProject("feedback_reply"))
     store.byId(id) ?: ToolResponses.error("No feedback with id $id")
     store.appendMessage(id, Author.AGENT, message)
     return "[replied] $id"
@@ -120,7 +128,7 @@ class FeedbackToolset : McpToolset {
       "PENDING and ACKNOWLEDGED items are NEVER deleted."
   )
   suspend fun feedback_clear_resolved(): ClearResult {
-    val deleted = FeedbackStore.getInstance(currentProject()).deleteResolved()
+    val deleted = FeedbackStore.getInstance(currentProject("feedback_clear_resolved")).deleteResolved()
     return ClearResult(deleted = deleted)
   }
 
@@ -138,7 +146,7 @@ class FeedbackToolset : McpToolset {
     timeoutSeconds: Int = 60,
     batchWindowSeconds: Int = 5,
   ): ListResult {
-    val project = currentProject()
+    val project = currentProject("feedback_watch")
     val store = FeedbackStore.getInstance(project)
     val initialIds = store.all().map { it.id }.toSet()
     val timeout = timeoutSeconds.coerceIn(1, 600)

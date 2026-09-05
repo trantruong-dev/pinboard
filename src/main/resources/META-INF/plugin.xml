@@ -21,7 +21,16 @@
                 icon="dev.pinboard.ui.toolwindow.PinboardIcons.ToolWindow"
                 factoryClass="dev.pinboard.ui.toolwindow.FeedbackToolWindowFactory"/>
     <notificationGroup id="Pinboard" displayType="BALLOON"/>
+    <editorTabColorProvider implementation="dev.pinboard.ui.editor.FeedbackTabColorProvider"/>
+    <editorFloatingToolbarProvider implementation="dev.pinboard.ui.PinboardFloatingToolbarProvider"/>
   </extensions>
+
+  <projectListeners>
+    <!-- Reopening a file changes nothing in the store, so the highlighter has to be told - otherwise
+         pins made in an earlier session stay invisible until the next unrelated queue edit. -->
+    <listener class="dev.pinboard.ui.editor.FeedbackFileOpenListener"
+              topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
+  </projectListeners>
 
   <actions>
     <action id="dev.pinboard.CaptureSelection"
@@ -42,5 +51,14 @@
       <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
       <add-to-group group-id="EditorTabPopupMenu" anchor="last"/>
     </action>
+
+    <!-- The button that floats over a selection. A group of its own because the platform addresses
+         a floating toolbar by group id, and because keeping it separate means the floating button
+         can be dropped without touching the action itself. -->
+    <group id="Pinboard.FloatingToolbar"
+           text="Pinboard Floating Toolbar"
+           description="The button Pinboard floats over a selected block of code">
+      <reference ref="dev.pinboard.CaptureSelection"/>
+    </group>
   </actions>
 </idea-plugin>

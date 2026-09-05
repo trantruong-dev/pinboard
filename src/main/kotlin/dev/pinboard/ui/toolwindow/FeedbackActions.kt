@@ -6,11 +6,14 @@ import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
+import dev.pinboard.capture.AnchorRegistry
 import dev.pinboard.model.Feedback
 import dev.pinboard.model.Scope
+import dev.pinboard.model.Status
 import dev.pinboard.store.FeedbackStore
 import dev.pinboard.util.ProjectFiles
 
@@ -36,7 +39,10 @@ object FeedbackNavigator {
       notifyMissing(project, relativePath)
       return
     }
-    val line = ((feedback.startLine ?: 1) - 1).coerceAtLeast(0)
+    // Prefer where the code is now over where it was pinned, so a jump after an edit above
+    // the pin still lands on the right lines.
+    val anchored = AnchorRegistry.getInstance(project).lineRange(feedback.id)?.first
+    val line = ((anchored ?: feedback.startLine ?: 1) - 1).coerceAtLeast(0)
     OpenFileDescriptor(project, file, line, 0).navigate(true)
   }
 
@@ -65,6 +71,45 @@ class DeleteFeedbackAction(
   override fun actionPerformed(e: AnActionEvent) {
     val feedback = selection.selected() ?: return
     FeedbackStore.getInstance(project).delete(feedback.id)
+  }
+}
+
+/**
+ * The "Clear" dropdown.
+ *
+ * A popup group rather than one Delete All button so the finished work can be cleared without
+ * touching the queue. Each entry shows a live count and disables itself when empty, which is what
+ * makes it safe to open and read - the user can see what a click would remove before clicking it.
+ */
+class ClearFeedbackActionGroup(project: Project) : DefaultActionGroup("Clear", true) {
+
+  init {
+    templatePresentation.icon = AllIcons.Actions.GC
+    templatePresentation.description = "Remove finished feedback, or the whole queue"
+    add(ClearByStatusAction(project, Status.RESOLVED))
+    add(ClearByStatusAction(project, Status.DISMISSED))
+    add(DeleteAllFeedbackAction(project))
+  }
+}
+
+/** Removes every item in one finished status. Not confirmed: the work it deletes is already done. */
+private class ClearByStatusAction(
+  private val project: Project,
+  private val status: Status,
+) : AnAction() {
+
+  override fun getActionUpdateThread() = ActionUpdateThread.EDT
+
+  override fun update(e: AnActionEvent) {
+    val count = FeedbackStore.getInstance(project).countByStatus(status)
+    e.presentation.text = "Clear ${status.name.lowercase()} ($count)"
+    e.presentation.isEnabled = count > 0
+  }
+
+  override fun actionPerformed(e: AnActionEvent) {
+    // One write, not one per item: clearing a long history item by item rewrites the store file
+    // once for each one.
+    FeedbackStore.getInstance(project).deleteByStatus(status)
   }
 }
 

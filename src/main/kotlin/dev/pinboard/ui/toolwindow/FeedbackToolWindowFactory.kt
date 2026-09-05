@@ -16,7 +16,7 @@ class FeedbackToolWindowFactory : ToolWindowFactory, DumbAware {
 
   override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
     val content = ContentFactory.getInstance().createContent(null, "Feedback", false)
-    val panel = FeedbackListPanel(project, content, toolWindow.disposable)
+    val panel = FeedbackListPanel(project, content, toolWindow.disposable, toolWindow)
     content.component = panel
     content.isCloseable = false
     toolWindow.contentManager.addContent(content)

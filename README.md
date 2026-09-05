@@ -47,15 +47,23 @@ disappeared.
 
 ## Use
 
-**Pin a selection.** Select code, right-click, **Pin for Agent**
-(`Ctrl+Alt+Shift+F`, `Cmd+Alt+Shift+F` on macOS). Type your note.
+**Pin a selection.** Select code, then press `Ctrl+Alt+Shift+F` (`Cmd+Alt+Shift+F` on macOS), click
+the button that floats over the selection, or right-click and choose **Pin for Agent**. A balloon
+opens at the caret: type your note and press `Ctrl+Enter` (`Cmd+Enter`). Esc cancels; clicking into
+the editor to re-read the code does not.
 
-**Pin a whole file.** Right-click the file in the Project view or its editor tab, **Feedback to
-Agent (File)**.
+**Pin a whole file.** Right-click the file in the Project view or its editor tab, **Pin File for
+Agent**.
 
-**Review the queue.** The **Pinboard** tool window on the right shows everything grouped by
-status, with the agent's replies. Double-click an item to jump back to the code. Delete a single
-item with the Del key, the toolbar button, or the row's context menu.
+**See your pins in the code.** A pinned range is tinted, marked in the error stripe, and carries a
+pin in the gutter that brings the queue forward. Any file with open feedback gets a faint wash on
+its tab. Editing above a pin moves it with the code rather than reporting it stale.
+
+**Review the queue.** The **Pinboard** tool window on the right shows everything as cards grouped by
+status, with the agent's replies. A bar across the top shows how much of the queue is done, and the
+tool window icon carries a dot while anything is pending. Click a status header to fold the group.
+Double-click an item or press Enter to jump back to the code. Delete a single item with the Del key,
+the toolbar button, or the row's context menu; **Clear** removes finished work in bulk.
 
 ## Teaching your agent to use it
 
@@ -104,6 +112,22 @@ MCP server, not to this plugin. Reconnect (`/mcp` in Claude Code) and ask the ag
 queue is untouched: nothing is lost, and an acknowledged item is still sitting there waiting to be
 resolved.
 
+## Is the agent actually connected?
+
+The chip at the top right of the tool window answers that, and the line along the bottom says when
+the agent last called a tool. Open **Log** next to it for the raw list of calls.
+
+| Chip | What it means |
+|---|---|
+| **Agent active** | A tool call arrived in the last ten minutes |
+| **Idle** | An agent has called before, but not lately. Normal between tasks |
+| **Waiting for agent** | Everything is wired up; nothing has called yet |
+| **Tools not registered** | The plugin loaded without its MCP tools. Restart the IDE |
+
+The chip never says "connected". This plugin rides the IDE's MCP server rather than running its own,
+so it cannot ask whether a client is attached - it can only report calls that actually arrived, and
+it says exactly that much and no more.
+
 ## Where your code goes
 
 Nowhere. The plugin makes no network calls and collects no telemetry.
@@ -129,3 +153,7 @@ Requires JDK 21.
 ## License
 
 [Apache-2.0](LICENSE)
+
+Parts of the presentation and interaction design - the card queue, the inline capture balloon, and
+the editor decorations - are adapted from [Marginalia](https://github.com/borgand/marginalia) (MIT).
+See [NOTICE](NOTICE).

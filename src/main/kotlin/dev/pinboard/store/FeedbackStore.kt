@@ -3,6 +3,7 @@ package dev.pinboard.store
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
 import com.intellij.util.concurrency.AppExecutorUtil
 import dev.pinboard.util.FilePaths
@@ -42,6 +43,9 @@ class FeedbackStore(private val project: Project) : Disposable {
     AppExecutorUtil.createBoundedScheduledExecutorService("PinboardStoreFlush", 1)
   private var dirty = false
   private var disposed = false
+
+  /** Whether a debounced flush is already armed. Guarded by [lock]. */
+  private var flushScheduled = false
 
   init {
     Disposer.register(project, this)
@@ -87,6 +91,38 @@ class FeedbackStore(private val project: Project) : Disposable {
     }
   }
 
+  /**
+   * Moves items to new line ranges, skipping any already there.
+   *
+   * This is how the runtime anchoring in [dev.pinboard.capture.AnchorRegistry] becomes durable: a
+   * marker dies with the document, so unless its position lands here it is lost on close.
+   *
+   * Two things make this safe to call on every edit. It takes the whole batch at once, because one
+   * edit near the top of a file moves every pin below it and doing them one at a time would rewrite
+   * the store file once per pin. And an item already at its range is skipped entirely, so a sync
+   * that moved nothing leaves the store clean - without that, sync would dirty the store, which
+   * schedules a flush, which syncs again, forever.
+   *
+   * Returns how many items actually moved.
+   */
+  fun updateLocations(locations: Map<String, Pair<Int, Int>>): Int {
+    if (locations.isEmpty()) return 0
+    lock.withLock {
+      var moved = 0
+      for ((id, range) in locations) {
+        val current = items[id] ?: continue
+        if (current.startLine == range.first && current.endLine == range.second) continue
+        items[id] = current.copy(startLine = range.first, endLine = range.second)
+        moved++
+      }
+      if (moved > 0) {
+        scheduleFlushLocked()
+        publishLocked()
+      }
+      return moved
+    }
+  }
+
   fun delete(id: String): Boolean {
     lock.withLock {
       if (items.remove(id) == null) return false
@@ -109,6 +145,35 @@ class FeedbackStore(private val project: Project) : Disposable {
       return count
     }
   }
+
+  /**
+   * Deletes every item in [status], in one write.
+   *
+   * The bulk shape is the point: clearing a long history one item at a time takes the lock,
+   * publishes and rewrites the store file once per item.
+   */
+  fun deleteByStatus(status: Status): Int {
+    lock.withLock {
+      val doomed = items.values.filter { it.status == status }
+      if (doomed.isEmpty()) return 0
+      doomed.forEach { tombstones.add(it.id); items.remove(it.id) }
+      scheduleFlushLocked()
+      publishLocked()
+      return doomed.size
+    }
+  }
+
+  /** How many items are in [status], without sorting the queue. */
+  fun countByStatus(status: Status): Int = items.values.count { it.status == status }
+
+  /**
+   * True when any open item points at [relativePath].
+   *
+   * Separate from [all] because the editor tab colour asks this for every tab on every repaint,
+   * where sorting the whole queue to answer a yes/no question is pure waste.
+   */
+  fun hasOpenItemFor(relativePath: String, isOpen: (Status) -> Boolean): Boolean =
+    items.values.any { isOpen(it.status) && it.filePath == relativePath }
 
   /**
    * Deletes only RESOLVED and DISMISSED items. PENDING and ACKNOWLEDGED are never touched -
@@ -151,14 +216,24 @@ class FeedbackStore(private val project: Project) : Disposable {
     return if (canonical == path) feedback else feedback.copy(filePath = canonical)
   }
 
+  /**
+   * Arms the debounced write, if one is not already armed.
+   *
+   * The guard matters because mutations arrive in bursts - a batch acknowledged over MCP, or every
+   * pin in a file shifting on one keystroke. Without it each mutation queues its own flush and the
+   * store file is serialised and rewritten once per item, on a single-threaded executor.
+   */
   private fun scheduleFlushLocked() {
     dirty = true
-    if (disposed) return
+    if (disposed || flushScheduled) return
+    flushScheduled = true
     executor.schedule({ flush() }, 300, TimeUnit.MILLISECONDS)
   }
 
   private fun flush() {
+    lock.withLock { flushScheduled = false }
     if (disposed) return
+    syncAnchorsBeforeWriting()
     // Snapshot the memory state under lock. We do NOT clear dirty here: a failed write must
     // leave dirty set so a later flush (or dispose) retries.
     val snapshot = lock.withLock { items.values.toList() }
@@ -189,6 +264,24 @@ class FeedbackStore(private val project: Project) : Disposable {
     }
   }
 
+  /**
+   * Folds any live anchoring back in, so what reaches disk is where the code is now rather than
+   * where it was when it was pinned.
+   *
+   * Runs before the lock is taken: the write-back goes through [updateLocation], which takes the
+   * same lock itself. Anchoring is an optimisation, so a failure here must never stop a write.
+   */
+  private fun syncAnchorsBeforeWriting() {
+    if (project.isDisposed) return
+    try {
+      dev.pinboard.capture.AnchorRegistry.getInstance(project).syncToStore()
+    } catch (e: ProcessCanceledException) {
+      throw e
+    } catch (e: Exception) {
+      LOG.debug("Anchor sync before flush failed", e)
+    }
+  }
+
   private fun publishLocked() {
     if (disposed) return
     project.messageBus.syncPublisher(FeedbackListener.TOPIC).onChanged()
@@ -200,6 +293,10 @@ class FeedbackStore(private val project: Project) : Disposable {
   }
 
   override fun dispose() {
+    // Before the lock, like the flush path: the write-back re-enters through updateLocations.
+    // Without this, drift from an edit inside the last debounce window never reaches disk and those
+    // items read stale on the next launch.
+    if (dirty) syncAnchorsBeforeWriting()
     lock.withLock {
       disposed = true
       if (dirty) {
@@ -215,6 +312,8 @@ class FeedbackStore(private val project: Project) : Disposable {
   }
 
   companion object {
+    private val LOG = com.intellij.openapi.diagnostic.Logger.getInstance(FeedbackStore::class.java)
+
     fun getInstance(project: Project): FeedbackStore = project.service<FeedbackStore>()
   }
 }

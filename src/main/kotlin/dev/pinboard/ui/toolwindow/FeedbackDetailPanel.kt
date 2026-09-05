@@ -16,6 +16,7 @@ import dev.pinboard.model.Author
 import dev.pinboard.model.Feedback
 import dev.pinboard.model.Scope
 import dev.pinboard.ui.dialog.CodePreviewPanel
+import dev.pinboard.ui.theme.PinboardFonts
 import java.awt.BorderLayout
 import javax.swing.JComponent
 import javax.swing.JPanel
@@ -85,7 +86,7 @@ class FeedbackDetailPanel(
         "${feedback.filePath}:${feedback.startLine}-${feedback.endLine}"
       else -> "${feedback.filePath}:${feedback.startLine}"
     }
-    val status = FeedbackTreeModel.label(feedback.status)
+    val status = StatusAppearance.label(feedback.status)
     val created = DateFormatUtil.formatPrettyDateTime(feedback.createdAt)
     return htmlBlock(
       "<b>${escape(location)}</b><br/>${escape(status)} &middot; ${escape(created)}",
@@ -130,10 +131,13 @@ class FeedbackDetailPanel(
   /**
    * Wrapping text block. User and agent text is escaped here - the store keeps it verbatim and the
    * display layer is where it becomes safe to render.
+   *
+   * Sized like the note in the queue card, so the same text does not change size when the user
+   * clicks it open.
    */
   private fun htmlBlock(text: String, escaped: Boolean = false): JComponent {
     val body = if (escaped) text else escape(text).replace("\n", "<br/>")
-    val viewer = SwingHelper.createHtmlViewer(true, null, null, null)
+    val viewer = SwingHelper.createHtmlViewer(true, PinboardFonts.note(), null, null)
     viewer.text = "<html><body>$body</body></html>"
     viewer.border = JBUI.Borders.empty()
     return viewer
