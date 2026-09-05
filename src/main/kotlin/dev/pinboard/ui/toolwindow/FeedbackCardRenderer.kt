@@ -110,7 +110,7 @@ class FeedbackCardRenderer : ListCellRenderer<FeedbackRow> {
     // card: the previous single-line row clipped anything that did not fit and lost it silently.
     panel.add(
       JBLabel(wrapped(feedback.note, bodyWidth(listWidth))).apply {
-        font = JBFont.regular()
+        font = PinboardFonts.note()
         foreground = PinboardColors.textPrimary
         alignmentX = Component.LEFT_ALIGNMENT
       },

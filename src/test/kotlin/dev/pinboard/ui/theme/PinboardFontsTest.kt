@@ -3,6 +3,7 @@ package dev.pinboard.ui.theme
 import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.editor.colors.EditorFontType
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import com.intellij.util.ui.JBFont
 
 class PinboardFontsTest : BasePlatformTestCase() {
 
@@ -40,5 +41,25 @@ class PinboardFontsTest : BasePlatformTestCase() {
       scheme.editorFontSize = original
     }
     assertEquals(original, PinboardFonts.editor().size)
+  }
+
+  /**
+   * A note reads as prose, so it keeps the proportional UI family. Falling back to the editor's
+   * family would set a paragraph in a monospaced face inside a narrow docked panel.
+   */
+  fun testTheNoteFontKeepsTheUiFamily() {
+    assertEquals(JBFont.regular().family, PinboardFonts.note().family)
+  }
+
+  /** Its size comes from the editor, which is the setting users reach for to make text readable. */
+  fun testTheNoteFontTakesTheEditorFontSize() {
+    val original = scheme.editorFontSize
+    try {
+      scheme.editorFontSize = original + 5
+      assertEquals(original + 5, PinboardFonts.note().size)
+    } finally {
+      scheme.editorFontSize = original
+    }
+    assertEquals(original, PinboardFonts.note().size)
   }
 }

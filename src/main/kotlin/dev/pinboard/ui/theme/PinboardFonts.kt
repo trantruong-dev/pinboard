@@ -2,6 +2,7 @@ package dev.pinboard.ui.theme
 
 import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.editor.colors.EditorFontType
+import com.intellij.util.ui.JBFont
 import java.awt.Font
 
 /**
@@ -25,4 +26,14 @@ object PinboardFonts {
    */
   fun editor(): Font =
     EditorColorsManager.getInstance().globalScheme.getFont(EditorFontType.PLAIN)
+
+  /**
+   * The font a feedback note is written in: the UI family at the editor's size.
+   *
+   * A note is prose, not code, so it keeps the proportional UI family - a monospaced paragraph in a
+   * narrow docked panel reads badly. The size comes from the editor because that is the setting a
+   * user reaches for when text in the IDE is too small, and the note is the card's main content;
+   * leaving it on the UI size made the note the one thing on screen that would not grow.
+   */
+  fun note(): Font = JBFont.regular().deriveFont(editor().size2D)
 }
