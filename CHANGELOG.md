@@ -4,13 +4,24 @@
 
 ### Added
 
+- `make release VERSION=x.y.z` does a whole release in one command: bumps the version, rolls the
+  changelog, runs the tests and the verifier, commits, tags, publishes to the Marketplace and pushes.
+
 ### Changed
+
+- The version lives in `gradle.properties` instead of `build.gradle.kts`, so the release command can
+  rewrite it.
 
 ### Deprecated
 
 ### Removed
 
 ### Fixed
+
+- The agent skill opened its loop on `feedback_watch`, which only ever returns items pinned after the
+  call. Anything already waiting in the queue was invisible, so an agent could sit blocking on an
+  empty queue while the backlog went untouched. It now starts with `feedback_list`, and reads
+  `totalPending` to notice a backlog after a timeout. Both user guides carried the same mistake.
 
 ### Security
 

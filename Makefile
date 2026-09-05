@@ -33,8 +33,12 @@ TEST ?=
 # this same property, one per matrix job, so a break names the IDE it broke on.
 IDE ?=
 
+# The version `make release` ships. There is no positional form: make reads a bare 0.0.3 as another
+# target to build and fails looking for a rule to make it.
+VERSION ?=
+
 .DEFAULT_GOAL := help
-.PHONY: help build test run verify dist publish changelog ci clean
+.PHONY: help build test run verify dist publish changelog release ci clean
 
 # Written out by hand rather than generated from the target comments, because generating it needs
 # grep and awk and this has to print the same under cmd.exe. Keep it in step with the targets.
@@ -47,8 +51,9 @@ help:
 	@echo run - launch a sandbox IDE with the plugin installed
 	@echo verify - JetBrains plugin verifier. IDE=IC-2025.3 checks against one IDE
 	@echo dist - build the installable zip into build/distributions
-	@echo publish - publish to the JetBrains Marketplace
+	@echo publish - publish the current version to the JetBrains Marketplace
 	@echo changelog - roll the Unreleased section into the current version
+	@echo release - VERSION=0.0.3 ships it: bump, changelog, test, commit, tag, publish, push
 	@echo ci - everything CI runs: tests, the distribution, then the verifier
 	@echo clean - delete build output
 
@@ -84,6 +89,37 @@ publish:
 # already exists and the new entries are lost without a word - recover them from git if it happens.
 changelog:
 	$(GRADLE) patchChangelog
+
+# The whole release, from a version number to a published plugin:
+#
+#   make release VERSION=0.0.3
+#
+# Write what changed under `## [Unreleased]` in CHANGELOG.md first. That section is the release
+# notes: it becomes the [0.0.3] section here and the description on the Marketplace page. Releasing
+# with it empty ships a version with nothing to say for itself.
+#
+# Each Gradle line is its own invocation on purpose. project.version is read when the build is
+# configured, so patchChangelog and publishPlugin can only see the new number from an invocation
+# later than the one that wrote it.
+#
+# The commit and the tag are made before the upload but pushed after it. An upload that fails then
+# leaves a local commit to retry or reset, instead of a tag on the remote announcing a release that
+# never reached the Marketplace. If the push is what fails, everything is already published and
+# committed - just push again.
+release:
+	@$(if $(VERSION),,$(error VERSION is not set - run make release VERSION=0.0.3))
+	@$(if $(JETBRAINS_MARKETPLACE_TOKEN),,$(error JETBRAINS_MARKETPLACE_TOKEN is not set - export it before releasing))
+	@echo Releasing $(VERSION). The working tree must be clean and on the branch you release from.
+	git diff --quiet HEAD
+	$(GRADLE) checkReleaseNotes
+	$(GRADLE) setVersion -PnewVersion=$(VERSION)
+	$(GRADLE) patchChangelog
+	$(MAKE) ci
+	git add gradle.properties CHANGELOG.md
+	git commit -m "feat: release $(VERSION)"
+	git tag -a v$(VERSION) -m "Pinboard $(VERSION)"
+	$(GRADLE) publishPlugin
+	git push --follow-tags origin main
 
 ci:
 	$(GRADLE) test buildPlugin verifyPlugin $(if $(IDE),-PverifyIde=$(IDE),)

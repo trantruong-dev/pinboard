@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "dev.pinboard"
-version = "0.0.2"
+version = providers.gradleProperty("pluginVersion").get()
 
 dependencies {
   intellijPlatform {
@@ -110,6 +110,69 @@ intellijPlatform {
         val version = requested.substringAfter('-')
         create(type, version)
       }
+    }
+  }
+}
+
+// Rewrites the pluginVersion line in gradle.properties, and nothing else in the file - line endings,
+// comments and the order of the other keys survive untouched, so the diff of a release is one line.
+//
+// This has to be its own Gradle invocation. project.version is read when the build is configured, so
+// patchChangelog, buildPlugin and publishPlugin in the same invocation would all still be looking at
+// the old number. `make release` runs them afterwards for that reason.
+tasks.register("setVersion") {
+  group = "release"
+  description = "Writes pluginVersion in gradle.properties. Needs -PnewVersion=x.y.z."
+
+  val requested = providers.gradleProperty("newVersion")
+  val current = project.version.toString()
+  val propertiesFile = layout.projectDirectory.file("gradle.properties").asFile
+
+  doLast {
+    val next = requested.orNull.orEmpty()
+    require(Regex("""\d+\.\d+\.\d+""").matches(next)) {
+      "setVersion needs -PnewVersion=x.y.z, got \"$next\""
+    }
+    require(next != current) {
+      "The version is already $current. Releasing it again would overwrite the Marketplace build."
+    }
+    val text = propertiesFile.readText()
+    val line = Regex("(?m)^pluginVersion=.*$").find(text)
+      ?: error("No pluginVersion line in gradle.properties to rewrite.")
+    propertiesFile.writeText(text.replaceRange(line.range, "pluginVersion=$next"))
+    logger.lifecycle("Version $current -> $next")
+  }
+}
+
+// The Unreleased section is the release notes: patchChangelog turns it into the version section, and
+// that section is what the Marketplace shows as what is new. An empty one is not an error to the
+// changelog plugin - it writes no section at all and says nothing about it, so the release goes out
+// with nothing to show for itself. Caught here, before anything has been written or uploaded.
+//
+// Read out of the file rather than through the changelog plugin's model, so that what fails the
+// check is exactly what a person sees in CHANGELOG.md.
+tasks.register("checkReleaseNotes") {
+  group = "release"
+  description = "Fails if CHANGELOG.md has no entries under Unreleased."
+
+  val changelogFile = layout.projectDirectory.file("CHANGELOG.md").asFile
+
+  doLast {
+    val heading = "## [Unreleased]"
+    val text = changelogFile.readText()
+    val start = text.indexOf(heading)
+    require(start >= 0) { "CHANGELOG.md has no $heading section." }
+
+    val rest = text.substring(start + heading.length)
+    val end = rest.indexOf("\n## ")
+    val body = if (end >= 0) rest.substring(0, end) else rest
+
+    // Group headings are always there, empty or not, so only a line that is neither blank nor a
+    // heading counts as something to release.
+    val entries = body.lineSequence().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") }
+    require(entries.any()) {
+      "CHANGELOG.md has nothing under $heading. Write what changed before releasing - that section " +
+        "becomes the release notes on the Marketplace."
     }
   }
 }
