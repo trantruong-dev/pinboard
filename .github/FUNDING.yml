@@ -1,0 +1,5 @@
+# Puts a Sponsor button on the repository page.
+#
+# Given as a literal URL rather than through the buy_me_a_coffee key, because that key takes a bare
+# username and this one contains a dot - a shape GitHub's own validator is not guaranteed to accept.
+custom: ["https://buymeacoffee.com/trantruong.dev"]

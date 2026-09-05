@@ -192,6 +192,13 @@ make verify IDE=IC-2025.3               # one IDE, as the CI matrix does
 
 Requires JDK 21.
 
+## Support this plugin
+
+Pinboard is free and always will be. If it saves you time, you can
+[buy me a coffee](https://buymeacoffee.com/trantruong.dev).
+
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/trantruong.dev)
+
 ## License
 
 [Apache-2.0](LICENSE)

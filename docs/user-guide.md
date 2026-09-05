@@ -456,9 +456,17 @@ one window at a time.
 
 ---
 
+## Support this plugin
+
+Pinboard is free and always will be. If it saves you time, you can
+[buy me a coffee](https://buymeacoffee.com/trantruong.dev).
+
+---
+
 ## Reference
 
 - Source and issues: <https://github.com/trantruong-dev/pinboard>
+- Support the plugin: <https://buymeacoffee.com/trantruong.dev>
 - Changelog: [CHANGELOG.md](../CHANGELOG.md)
 - Licence: Apache-2.0. Parts of the presentation and interaction design are adapted from
   [Marginalia](https://github.com/borgand/marginalia) (MIT)

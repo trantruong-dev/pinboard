@@ -452,9 +452,17 @@ này, mỗi lúc chỉ sửa một mục từ một cửa sổ.
 
 ---
 
+## Ủng hộ plugin
+
+Pinboard miễn phí và sẽ luôn miễn phí. Nếu nó giúp bạn tiết kiệm thời gian, bạn có thể
+[mời tôi một ly cà phê](https://buymeacoffee.com/trantruong.dev).
+
+---
+
 ## Tham khảo
 
 - Mã nguồn và báo lỗi: <https://github.com/trantruong-dev/pinboard>
+- Ủng hộ plugin: <https://buymeacoffee.com/trantruong.dev>
 - Nhật ký thay đổi: [CHANGELOG.md](../CHANGELOG.md)
 - Giấy phép: Apache-2.0. Một phần thiết kế giao diện và tương tác được phỏng theo
   [Marginalia](https://github.com/borgand/marginalia) (MIT)
