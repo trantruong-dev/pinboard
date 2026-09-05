@@ -4,6 +4,20 @@
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [0.0.3] - 2026-09-05
+
+### Added
+
 - `make release VERSION=x.y.z` does a whole release in one command: bumps the version, rolls the
   changelog, runs the tests and the verifier, commits, tags, publishes to the Marketplace and pushes.
 
@@ -12,18 +26,12 @@
 - The version lives in `gradle.properties` instead of `build.gradle.kts`, so the release command can
   rewrite it.
 
-### Deprecated
-
-### Removed
-
 ### Fixed
 
 - The agent skill opened its loop on `feedback_watch`, which only ever returns items pinned after the
   call. Anything already waiting in the queue was invisible, so an agent could sit blocking on an
   empty queue while the backlog went untouched. It now starts with `feedback_list`, and reads
   `totalPending` to notice a backlog after a timeout. Both user guides carried the same mistake.
-
-### Security
 
 ## [0.0.2] - 2026-09-05
 
@@ -63,6 +71,7 @@
   a re-pin.
 - Claude Code skill in `claude-skill/SKILL.md`.
 
-[Unreleased]: https://github.com/trantruong-dev/pinboard/compare/v0.0.2...HEAD
+[Unreleased]: https://github.com/trantruong-dev/pinboard/compare/v0.0.3...HEAD
+[0.0.3]: https://github.com/trantruong-dev/pinboard/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/trantruong-dev/pinboard/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/trantruong-dev/pinboard/commits/v0.0.1
