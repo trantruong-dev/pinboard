@@ -4,6 +4,20 @@
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [0.0.2] - 2026-09-05
+
+### Added
+
 - User guide in English and Vietnamese under `docs/`, including how to connect agents other than
   Claude Code and where each client keeps its standing instructions.
 - One-command skill install for any agent: `npx skills add trantruong-dev/pinboard`.
@@ -15,14 +29,6 @@
 
 - The Claude Code skill moved from `claude-skill/SKILL.md` to `skills/pinboard/SKILL.md`, the layout
   Claude Code discovers automatically.
-
-### Deprecated
-
-### Removed
-
-### Fixed
-
-### Security
 
 ## [0.0.1] - 2026-09-05
 
@@ -46,5 +52,6 @@
   a re-pin.
 - Claude Code skill in `claude-skill/SKILL.md`.
 
-[Unreleased]: https://github.com/trantruong-dev/pinboard/compare/v0.0.1...HEAD
+[Unreleased]: https://github.com/trantruong-dev/pinboard/compare/v0.0.2...HEAD
+[0.0.2]: https://github.com/trantruong-dev/pinboard/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/trantruong-dev/pinboard/commits/v0.0.1

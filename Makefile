@@ -79,6 +79,9 @@ publish:
 
 # CHANGELOG.md is generated. Move the Unreleased section under the current version with this, never
 # by editing the file.
+#
+# Bump the version first. Running this twice at one version folds Unreleased into a section that
+# already exists and the new entries are lost without a word - recover them from git if it happens.
 changelog:
 	$(GRADLE) patchChangelog
 
