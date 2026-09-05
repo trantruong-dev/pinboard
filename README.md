@@ -142,10 +142,21 @@ The MCP server that serves these tools is the IDE's own, bound to localhost.
 ## Building from source
 
 ```
-./gradlew build          # compile and test
-./gradlew runIde         # launch a sandbox IDE with the plugin
-./gradlew verifyPlugin   # JetBrains plugin verifier
-./gradlew buildPlugin    # produces build/distributions/*.zip
+make build      # compile and test
+make run        # launch a sandbox IDE with the plugin
+make verify     # JetBrains plugin verifier
+make dist       # produces build/distributions/*.zip
+make ci         # everything CI runs, before you push
+```
+
+`make` on its own lists every target. It wraps Gradle, so `./gradlew build` and friends work
+exactly as before if you prefer them.
+
+Two targets take an argument:
+
+```
+make test TEST='*.AnchorRegistryTest'   # one class, or one method
+make verify IDE=IC-2025.3               # one IDE, as the CI matrix does
 ```
 
 Requires JDK 21.
