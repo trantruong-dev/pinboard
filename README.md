@@ -67,10 +67,25 @@ the toolbar button, or the row's context menu; **Clear** removes finished work i
 
 ## Teaching your agent to use it
 
-The tools are available as soon as the plugin is installed, but an agent will not know when to
-reach for them. For Claude Code, copy [`claude-skill/SKILL.md`](claude-skill/SKILL.md) into
-`~/.claude/skills/pinboard/SKILL.md`. It tells the agent to pick up batches, how to
-read the `stale` flag, and to close each item with a summary you can audit.
+The tools are available as soon as the plugin is installed, but an agent will not know when to reach
+for them. The skill tells it to pick up batches, how to read the `stale` flag, and to close each item
+with a summary you can audit.
+
+In Claude Code:
+
+```
+/plugin marketplace add trantruong-dev/pinboard
+/plugin install pinboard@trantruong-dev
+/reload-plugins
+```
+
+Or copy [`skills/pinboard/SKILL.md`](skills/pinboard/SKILL.md) to `~/.claude/skills/pinboard/SKILL.md`
+by hand, which works on any version.
+
+## Documentation
+
+- **[User guide](docs/user-guide.md)** - install, connect an agent, everyday use, troubleshooting
+- **[Hướng dẫn sử dụng](docs/user-guide-vi.md)** - bản tiếng Việt
 
 ## The tools
 

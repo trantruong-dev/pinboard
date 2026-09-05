@@ -1,0 +1,348 @@
+# Pinboard - Hướng dẫn sử dụng
+
+Ghim góp ý lên nhiều đoạn code, rồi bảo agent xử lý cả loạt.
+
+Tài liệu này hướng dẫn cài đặt, kết nối agent, sử dụng hằng ngày, và xử lý khi có sự cố. Bản tiếng
+Anh ở [user-guide.md](user-guide.md).
+
+---
+
+## 1. Pinboard sinh ra để làm gì
+
+JetBrains IDE của bạn vốn đã có sẵn một MCP server, và nó đã có thể đưa vùng chọn hiện tại cho agent.
+Nhưng kênh đó là đồng bộ và chỉ dùng một lần: bạn trỏ vào một chỗ, agent nhìn vào đó, xong là hết.
+
+Review code không diễn ra như vậy. Bạn đọc một file, thấy năm vấn đề, và muốn ghi lại cả năm, đọc
+tiếp, rồi mới giao cả loạt khi đã xong.
+
+Pinboard bổ sung đúng phần còn thiếu đó:
+
+- **Một hàng đợi.** Ghim bao nhiêu ghi chú tùy ý. Chưa gửi đi đâu cả.
+- **Gom lô.** Agent lấy cả cụm góp ý trong một lần gọi, thay vì mỗi việc một lượt qua lại.
+- **Luồng hội thoại.** Agent trả lời, đặt câu hỏi, và ghi lại nó đã làm gì, ngay cạnh đoạn code bạn
+  đã ghim.
+- **Không mất khi khởi động lại.** Đóng IDE, mở lại, hàng đợi và lịch sử vẫn còn nguyên.
+- **Cờ stale.** Nếu code đã thay đổi sau khi ghim, agent được báo, kèm ảnh chụp code lúc ghim để
+  định vị lại.
+
+---
+
+## 2. Điều kiện cần
+
+| | |
+|---|---|
+| IDE | Bất kỳ JetBrains IDE nào, build **252 (2025.2)** trở lên - IntelliJ IDEA, PyCharm, WebStorm, GoLand... |
+| Phiên bản | Cả Community lẫn Ultimate đều chạy được |
+| Plugin đi kèm | Bắt buộc bật **MCP Server**. Plugin này có sẵn trong IDE, không cần cài riêng |
+| Agent | Bất kỳ MCP client nào nói chuyện được với server của IDE. Claude Code cấu hình chỉ bằng một cú nhấp |
+| Git | Không bắt buộc. Nếu project là repository Git, Pinboard ghi lại revision tại thời điểm ghim |
+
+### Kiểm tra plugin MCP Server
+
+Vào **Settings | Plugins | Installed**, tìm *MCP Server*. Nó phải tồn tại và đang được bật.
+
+Nếu nó bị tắt, Pinboard sẽ không cài được. Pinboard khai báo phụ thuộc cứng vào plugin đó, vì không
+có server ấy thì các tool không có chỗ nào để xuất hiện.
+
+> **Lưu ý về phiên bản IDE.** Pinboard cố ý không đặt giới hạn phiên bản trên, để plugin vẫn chạy khi
+> IDE lên phiên bản lớn mới. Đổi lại, một bản IDE tương lai có thể thay đổi thứ gì đó bên dưới. Nếu
+> có trục trặc ngay sau khi cập nhật IDE, đây là nguyên nhân cần nghi ngờ đầu tiên.
+
+---
+
+## 3. Cài plugin
+
+1. Vào **Settings | Plugins | Marketplace**.
+2. Tìm **Pinboard**.
+3. Bấm **Install**.
+4. **Khởi động lại IDE** khi được hỏi.
+
+Việc khởi động lại là bắt buộc, và không phải do plugin làm biếng. Pinboard đăng ký các MCP tool, mà
+nạp nóng một phần sẽ để lại tình trạng tool window vẫn chạy trong khi các tool đã âm thầm biến mất -
+đây là kiểu hỏng tệ nhất, vì nhìn bề ngoài mọi thứ vẫn bình thường. Bắt khởi động lại khiến việc cài
+và cập nhật hoặc là xong hẳn, hoặc là không.
+
+### Cài từ file
+
+Nếu bạn có file `pinboard-<phiên bản>.zip`:
+
+**Settings | Plugins**, bấm biểu tượng bánh răng, chọn **Install Plugin from Disk...**, chọn file
+zip, rồi khởi động lại.
+
+### Xác nhận đã cài xong
+
+Sau khi khởi động lại, ở cạnh phải cửa sổ IDE phải xuất hiện nút tool window tên **Pinboard**. Mở nó
+ra. Nếu thấy, tức là plugin đã nạp thành công.
+
+---
+
+## 4. Kết nối agent
+
+Pinboard không tự chạy server riêng. Các tool của nó xuất hiện trên MCP server mà IDE vốn đã chạy,
+nên bạn không phải viết tay bất kỳ cấu hình MCP nào.
+
+1. Mở phần cài đặt MCP của IDE:
+   - **2025.2**: Settings | Tools | **MCP Server**
+   - **2026.x**: Settings | Tools | **Client Auto-Configuration**
+2. Tìm client của bạn trong danh sách. Với **Claude Code**, một cú nhấp là IDE tự ghi cấu hình cho
+   bạn.
+3. **Khởi động lại agent** để nó nhận server mới.
+
+Riêng với Claude Code, sau khi khởi động lại hãy chạy `/mcp` và kiểm tra server của IDE có trong danh
+sách và đang kết nối.
+
+### Bạn sẽ thấy gì
+
+Khi agent đã gọi bất kỳ tool nào của Pinboard dù chỉ một lần, con chip ở góc trên bên phải tool window
+sẽ đổi trạng thái. Xem [mục 8](#8-agent-đã-kết-nối-thật-chưa).
+
+---
+
+## 5. Dạy agent biết khi nào cần dùng
+
+Các tool đã sẵn sàng ngay khi cài plugin, nhưng agent không có lý do gì để tự tìm đến chúng. Nó không
+biết là có một hàng đợi tồn tại, cũng không biết khi nào nên kiểm tra. Đó là việc của skill: skill bảo
+agent lấy góp ý theo lô, cách đọc cờ `stale`, và phải đóng mỗi mục bằng một bản tóm tắt mà bạn kiểm
+chứng được.
+
+### Cách A - cài bằng câu lệnh (khuyến nghị)
+
+Trong Claude Code, chạy hai lệnh sau:
+
+```
+/plugin marketplace add trantruong-dev/pinboard
+/plugin install pinboard@trantruong-dev
+```
+
+Lệnh đầu đăng ký repository này thành một plugin marketplace; lệnh sau cài skill từ đó. Không phải
+copy file nào, và khi có phiên bản mới thì `/plugin` sẽ đề nghị bạn cập nhật.
+
+Sau đó chạy `/reload-plugins`. Không cần khởi động lại Claude Code.
+
+Lưu ý:
+
+- `/plugin` cần một phiên bản Claude Code tương đối mới. Nếu lệnh không được nhận, hãy dùng cách B.
+- Marketplace được đăng ký **theo người dùng**, nên bạn chỉ làm một lần, không phải làm lại cho từng
+  project.
+- Nó đọc từ GitHub, nên chạy được trên mọi máy có mạng.
+
+### Cách B - copy file thủ công
+
+Copy file [`skills/pinboard/SKILL.md`](../skills/pinboard/SKILL.md) trong repository này sang:
+
+| | |
+|---|---|
+| macOS / Linux | `~/.claude/skills/pinboard/SKILL.md` |
+| Windows | `%USERPROFILE%\.claude\skills\pinboard\SKILL.md` |
+
+Tự tạo thư mục nếu chưa có. Cách này chạy được trên mọi phiên bản Claude Code.
+
+### Các agent khác
+
+Mọi MCP client đều gọi được các tool mà không cần skill - skill chỉ dạy *khi nào* nên dùng. Với client
+không có cơ chế skill, hãy dán nội dung `SKILL.md` vào system prompt hoặc phần hướng dẫn của project,
+hoặc đơn giản là bảo agent *"kiểm tra pinboard đi"* khi bạn muốn nó xem.
+
+---
+
+## 6. Sử dụng hằng ngày
+
+### Ghim một vùng chọn
+
+Bôi đen đoạn code, rồi làm một trong các cách:
+
+- Nhấn **`Ctrl+Alt+Shift+F`** (**`Cmd+Alt+Shift+F`** trên macOS)
+- Bấm nút nổi lên phía trên vùng chọn
+- Chuột phải, chọn **Pin for Agent**
+
+Một bong bóng mở ra ngay tại con trỏ. Gõ ghi chú rồi nhấn **`Ctrl+Enter`** (**`Cmd+Enter`**) để ghim.
+
+- **Esc** để hủy.
+- Bấm vào editor để đọc lại code thì **không** làm mất bong bóng - nó vẫn mở trong lúc bạn xem quanh.
+
+### Ghim cả file
+
+Chuột phải vào file trong khung **Project**, hoặc chuột phải vào **tab editor** của file, chọn
+**Pin File for Agent**. Dùng cách này cho những ghi chú về cả file chứ không phải một dòng cụ thể.
+
+### Nhìn thấy pin ngay trong code
+
+Một vùng đã ghim sẽ:
+
+- được tô nền trong editor,
+- có vạch đánh dấu ở thanh cuộn bên phải,
+- có biểu tượng pin ở lề trái - bấm vào đó sẽ mở hàng đợi lên.
+
+File nào còn góp ý chưa xử lý thì tab editor của nó được phủ một lớp màu nhạt, để bạn liếc qua là
+biết file đang mở nào còn việc.
+
+**Sửa code ở phía trên một pin thì pin sẽ trôi theo code**, chứ không bị báo stale. Chỉ khi chính
+đoạn code đã ghim bị thay đổi thì mới thành stale.
+
+### Làm việc trong tool window
+
+Tool window **Pinboard** bên phải hiển thị hàng đợi dưới dạng thẻ, nhóm theo trạng thái.
+
+| Thao tác | Cách làm |
+|---|---|
+| Nhảy về đoạn code đã ghim | Nhấp đúp vào thẻ, hoặc chọn thẻ rồi nhấn **Enter** |
+| Gập hoặc mở một nhóm trạng thái | Bấm vào tiêu đề nhóm |
+| Xóa một mục | Phím **Del**, nút trên thanh công cụ, hoặc menu chuột phải của thẻ |
+| Xóa hàng loạt việc đã xong | Menu **Clear**: *Clear resolved*, *Clear dismissed* |
+| Xóa sạch | **Delete All** - có hỏi lại, vì không hoàn tác được |
+
+Phía trên có một thanh cho biết đã xử lý được bao nhiêu phần hàng đợi. Biểu tượng tool window có một
+chấm tròn khi còn mục đang chờ, nên bạn biết còn việc mà không cần mở panel ra.
+
+Chọn một thẻ sẽ hiện khung chi tiết: nó trỏ vào đâu, code đã dịch chuyển chưa, nội dung ghi chú, đoạn
+code tại thời điểm ghim, và toàn bộ hội thoại với agent.
+
+---
+
+## 7. Vòng đời của một mục
+
+Mỗi mục luôn ở đúng một trong bốn trạng thái.
+
+| Trạng thái | Ý nghĩa |
+|---|---|
+| **Pending** | Bạn vừa ghim. Chưa ai xem |
+| **Acknowledged** | Agent đã đọc và đang làm. **Chưa xong** |
+| **Resolved** | Agent đã làm xong và để lại tóm tắt việc đã làm |
+| **Dismissed** | Agent quyết định không xử lý, và để lại lý do |
+
+Nhóm resolved và dismissed mặc định được gập lại, vì đó là lịch sử, để mở ra sẽ đẩy các mục đang chờ
+ra khỏi tầm nhìn.
+
+**Acknowledged không có nghĩa là xong.** Nếu agent khởi động lại giữa chừng, các mục acknowledged
+chính là những việc nó đã bắt đầu; một agent làm đúng sẽ quay lại làm tiếp.
+
+### Khi code thay đổi bên dưới một pin
+
+- **Stale** - chính đoạn code đã ghim bị thay đổi sau khi ghim. Số dòng không còn tin được nữa. Agent
+  được báo điều này, kèm ảnh chụp code lúc ghim và tên symbol bao quanh, để tìm xem đoạn code đó giờ
+  nằm ở đâu.
+- **File missing** - file đã bị đổi tên, di chuyển, hoặc xóa. Agent được yêu cầu nói thẳng ra thay vì
+  bịa ra một vị trí.
+
+Trong cả hai trường hợp, ảnh chụp code vẫn là căn cứ chính. Không mất gì cả.
+
+---
+
+## 8. Agent đã kết nối thật chưa
+
+Con chip ở góc trên bên phải tool window trả lời câu này, còn dòng chạy dọc phía dưới cho biết agent
+gọi tool lần cuối lúc nào. Mở **Log** ngay cạnh đó để xem danh sách các lệnh gọi.
+
+| Chip | Nghĩa là gì | Cần làm gì |
+|---|---|---|
+| **Agent active** | Có lệnh gọi tool trong mười phút gần đây | Không cần làm gì |
+| **Idle** | Agent từng gọi, nhưng gần đây thì không | Bình thường, giữa hai tác vụ |
+| **Waiting for agent** | Mọi thứ đã sẵn sàng; chưa có ai gọi | Kiểm tra agent có đang chạy và đã cấu hình server của IDE chưa |
+| **Tools not registered** | Plugin nạp được nhưng thiếu các MCP tool | Khởi động lại IDE |
+
+Con chip cố ý không bao giờ nói "đã kết nối". Pinboard chạy nhờ MCP server của IDE chứ không tự chạy
+server riêng, nên nó không thể hỏi xem có client nào đang gắn vào hay không. Nó chỉ báo những lệnh gọi
+thực sự đã đến, và chỉ nói đúng chừng đó.
+
+---
+
+## 9. Các tool mà agent nhận được
+
+| Tool | Chức năng |
+|---|---|
+| `feedback_list` | Hàng đợi hiện tại. Mặc định lấy pending và acknowledged |
+| `feedback_watch` | Chặn lại cho đến khi có mục mới, rồi trả về cả lô |
+| `feedback_acknowledge` | Đánh dấu đã xem. Nhận cả lô trong một lần gọi |
+| `feedback_resolve` | Đóng một mục, bắt buộc kèm tóm tắt việc đã làm |
+| `feedback_dismiss` | Đóng một mục, bắt buộc kèm lý do không xử lý |
+| `feedback_reply` | Thêm câu hỏi hoặc ghi chú vào luồng, không đổi trạng thái |
+| `feedback_clear_resolved` | Xóa các mục đã resolved hoặc dismissed |
+
+MCP client của bạn có thể hiển thị các tool này kèm tiền tố lấy từ tên server, ví dụ
+`mcp__idea__feedback_list`. Đó là bình thường.
+
+**Agent không thể tạo góp ý, và không thể xóa bất cứ thứ gì còn pending hoặc acknowledged.** Ranh giới
+đó là cố ý. Hàng đợi là bản ghi của bạn về những gì bạn đã yêu cầu, và một agent có thể âm thầm dọn
+sạch phần việc nó chưa làm xong sẽ hủy mất bản ghi duy nhất đó.
+
+---
+
+## 10. Dữ liệu của bạn đi đâu
+
+Không đi đâu cả. Plugin không gọi mạng và không thu thập telemetry.
+
+Hàng đợi được lưu dạng JSON trong thư mục system của IDE
+(`PathManager.getSystemPath()/pinboard/`), mỗi project một file, tên file lấy từ hash đường dẫn gốc
+của project. Nó nằm **ngoài repository**, nên không bao giờ lọt vào commit.
+
+**File đó chứa mã nguồn nguyên văn** - ảnh chụp của mọi thứ bạn đã ghim - nên hãy giữ thư mục đó cẩn
+thận như chính repository.
+
+MCP server phục vụ các tool này là server của IDE, chỉ lắng nghe trên localhost.
+
+### Mỗi project một hàng đợi
+
+Các hàng đợi không bao giờ lẫn vào nhau. Mở mười project cùng lúc thì agent làm việc trong project nào
+chỉ thấy góp ý của project đó.
+
+---
+
+## 11. Xử lý sự cố
+
+**Không thấy tool window Pinboard đâu.**
+Plugin chưa nạp. Vào **Settings | Plugins | Installed** kiểm tra Pinboard đang bật, và **MCP Server**
+cũng đang bật. Rồi khởi động lại IDE.
+
+**Chip báo "Tools not registered".**
+Plugin đã nạp nhưng các MCP tool chưa đăng ký được. Khởi động lại IDE. Nếu khởi động lại vẫn vậy thì
+nhiều khả năng plugin MCP Server đang bị tắt.
+
+**Chip cứ đứng ở "Waiting for agent".**
+Phía IDE không có vấn đề gì - chỉ là chưa có ai gọi. Kiểm tra agent có đang chạy không, đã cấu hình
+MCP server của IDE chưa, và sau khi cấu hình đã khởi động lại agent chưa. Trong Claude Code, lệnh
+`/mcp` liệt kê các server mà nó nhìn thấy.
+
+**Agent nói không tìm thấy `feedback_watch`.**
+Client thường hiển thị tool kèm tiền tố, nên tên thật có thể là `mcp__idea__feedback_watch`. Agent nào
+tìm đúng tên trần mà không thấy thì phải tìm lại theo phần đuôi. Skill ở
+[mục 5](#5-dạy-agent-biết-khi-nào-cần-dùng) dặn agent làm đúng như vậy.
+
+**Agent báo `HTTP 404: Session not found`.**
+Một lượt làm việc dài của agent đã sống lâu hơn phiên MCP của IDE. Đây là server có sẵn của IDE, không
+phải của Pinboard. Kết nối lại (`/mcp` trong Claude Code) rồi bảo agent thử lại. Không mất gì cả - mục
+đã acknowledged vẫn nằm đó chờ được resolve.
+
+**Một pin báo "file missing" nhưng file vẫn nằm đó.**
+File đã bị di chuyển hoặc đổi tên sau khi ghim. Pinboard lưu đường dẫn tại thời điểm ghim. Ảnh chụp
+code vẫn còn nguyên, nên ghi chú vẫn đọc được và agent được yêu cầu định vị lại thay vì đoán bừa.
+
+**Hai cửa sổ IDE trên cùng một repository.**
+Chúng dùng chung một hàng đợi, đây là chủ ý, và tin nhắn trong luồng từ cả hai phía được gộp lại chứ
+không bị mất. Nhưng mọi thứ còn lại của một mục - nội dung ghi chú, trạng thái - vẫn theo nguyên tắc
+ghi sau đè ghi trước. Sửa cùng một mục từ hai cửa sổ cùng lúc thì một bên sẽ mất. Nếu bạn làm việc kiểu
+này, mỗi lúc chỉ sửa một mục từ một cửa sổ.
+
+---
+
+## 12. Một ví dụ trọn vẹn
+
+1. Bạn đang review một pull request trong IDE. Bạn thấy bốn vấn đề nằm ở ba file.
+2. Bạn bôi đen từng chỗ và nhấn `Ctrl+Alt+Shift+F`, mỗi lần gõ một ghi chú ngắn. Bốn thẻ xuất hiện
+   dưới nhóm **Pending**. Chưa có gì được gửi đi đâu cả.
+3. Bạn bảo agent: *"xử lý hết pinboard đi"*.
+4. Agent gọi `feedback_watch`, nhận cả bốn mục trong một lô, rồi gọi `feedback_acknowledge` với cả bốn
+   id. Trong tool window, chúng chuyển sang **Acknowledged** và thanh tiến độ nhích lên.
+5. Với từng mục, agent đọc ghi chú của bạn và ảnh chụp code, thực hiện thay đổi, rồi gọi
+   `feedback_resolve` kèm tóm tắt đúng những gì nó đã làm.
+6. Bạn đọc các bản tóm tắt trong khung chi tiết, ngay cạnh đoạn code đã ghim. Một mục không đúng ý
+   bạn, nên bạn ghim thêm một góp ý nữa.
+7. Khi đã hài lòng, **Clear | Clear resolved** dọn sạch phần việc đã xong.
+
+---
+
+## Tham khảo
+
+- Mã nguồn và báo lỗi: <https://github.com/trantruong-dev/pinboard>
+- Nhật ký thay đổi: [CHANGELOG.md](../CHANGELOG.md)
+- Giấy phép: Apache-2.0. Một phần thiết kế giao diện và tương tác được phỏng theo
+  [Marginalia](https://github.com/borgand/marginalia) (MIT)

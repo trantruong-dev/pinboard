@@ -4,7 +4,14 @@
 
 ### Added
 
+- User guide in English and Vietnamese under `docs/`.
+- Claude Code plugin manifest, so the skill installs with `/plugin marketplace add
+  trantruong-dev/pinboard` instead of being copied by hand.
+
 ### Changed
+
+- The Claude Code skill moved from `claude-skill/SKILL.md` to `skills/pinboard/SKILL.md`, the layout
+  Claude Code discovers automatically.
 
 ### Deprecated
 

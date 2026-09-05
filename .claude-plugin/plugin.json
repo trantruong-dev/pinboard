@@ -1,0 +1,11 @@
+{
+  "name": "pinboard",
+  "description": "Teaches Claude Code to work through the feedback queue pinned from a JetBrains IDE by the Pinboard plugin.",
+  "version": "0.0.1",
+  "author": {
+    "name": "Trần Quang Trường"
+  },
+  "homepage": "https://github.com/trantruong-dev/pinboard",
+  "repository": "https://github.com/trantruong-dev/pinboard",
+  "license": "Apache-2.0"
+}
