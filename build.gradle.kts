@@ -60,6 +60,10 @@ intellijPlatform {
             given the original snapshot and enclosing symbol to relocate from.</li>
       </ul>
       No MCP configuration to write by hand. No network calls, no telemetry.
+      <br/><br/>
+      <a href="https://github.com/trantruong-dev/pinboard">Documentation and source</a> &middot;
+      Free, and always will be. If it saves you time, you can
+      <a href="https://buymeacoffee.com/trantruong.dev">buy me a coffee</a>.
     """.trimIndent()
     version = project.version.toString()
     vendor {

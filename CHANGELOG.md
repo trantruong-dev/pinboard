@@ -7,6 +7,7 @@
 - User guide in English and Vietnamese under `docs/`, including how to connect agents other than
   Claude Code and where each client keeps its standing instructions.
 - One-command skill install for any agent: `npx skills add trantruong-dev/pinboard`.
+- Links to the documentation and to a donation page at the end of the Marketplace description.
 - Claude Code plugin manifest, so the skill also installs with `/plugin marketplace add
   trantruong-dev/pinboard` instead of being copied by hand.
 
