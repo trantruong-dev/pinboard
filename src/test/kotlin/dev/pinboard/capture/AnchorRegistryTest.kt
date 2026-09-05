@@ -360,4 +360,34 @@ class AnchorRegistryTest : BasePlatformTestCase() {
     })
     assertEquals("the whole batch is one store write", 1, publishes)
   }
+
+  /**
+   * The store flushes on a pooled thread with no read lock, and the write-back runs from there.
+   * Anything on that path that touches the platform model has to carry its own read action -
+   * asking a RangeMarker for its document is such a read, and did not.
+   */
+  fun testTheWriteBackRunsFromAThreadWithNoReadLock() {
+    val document = documentFor(
+      "src/anchors/OffEdt.kt",
+      listOf("val a = 1", "val target = 2", "").joinToString("\n"),
+    )
+    pin("offedt", "src/anchors/OffEdt.kt", 2, 2, "val target = 2")
+    registry.anchorAt("offedt", document, 2, 2)
+    store.delete("offedt") // forces the cleanup path, which is where the read happened
+
+    val failure = java.util.concurrent.atomic.AtomicReference<Throwable>()
+    val done = java.util.concurrent.CountDownLatch(1)
+    com.intellij.openapi.application.ApplicationManager.getApplication().executeOnPooledThread {
+      try {
+        registry.syncToStore()
+      } catch (t: Throwable) {
+        failure.set(t)
+      } finally {
+        done.countDown()
+      }
+    }
+    assertTrue("sync did not finish", done.await(30, java.util.concurrent.TimeUnit.SECONDS))
+    failure.get()?.let { throw AssertionError("sync threw off the EDT", it) }
+    assertFalse(registry.isAnchored("offedt"))
+  }
 }

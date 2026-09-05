@@ -35,7 +35,15 @@ import dev.pinboard.util.ProjectFiles
 class AnchorRegistry(private val project: Project) : Disposable {
 
   private val lock = Any()
-  private val markers = mutableMapOf<String, RangeMarker>()
+  private val anchors = mutableMapOf<String, Anchor>()
+
+  /**
+   * A marker and the document it was created in.
+   *
+   * The document is kept rather than read back from the marker because `RangeMarker.getDocument`
+   * is a model read, and cleanup runs on the store's flush thread, which holds no read lock.
+   */
+  private data class Anchor(val marker: RangeMarker, val document: Document)
 
   /**
    * One listener per document, disposed when that document's last marker goes.
@@ -59,7 +67,7 @@ class AnchorRegistry(private val project: Project) : Disposable {
   fun anchorAt(feedbackId: String, document: Document, startLine: Int, endLine: Int) {
     ReadAction.run<RuntimeException> {
       val offsets = offsetsFor(document, startLine, endLine) ?: return@run
-      put(feedbackId, document.createRangeMarker(offsets.first, offsets.second))
+      put(feedbackId, document.createRangeMarker(offsets.first, offsets.second), document)
       watch(document)
     }
   }
@@ -89,7 +97,7 @@ class AnchorRegistry(private val project: Project) : Disposable {
         // which is a different range from the one anchorAt builds for the same lines.
         val snippet = feedback.codeSnapshot?.trimEnd('\n', '\r')?.takeIf { it.isNotEmpty() } ?: continue
         val at = soleOccurrenceOf(text, snippet) ?: continue
-        put(feedback.id, document.createRangeMarker(at, at + snippet.length))
+        put(feedback.id, document.createRangeMarker(at, at + snippet.length), document)
         anchoredAny = true
       }
       if (anchoredAny) watch(document)
@@ -103,10 +111,10 @@ class AnchorRegistry(private val project: Project) : Disposable {
    * restart, not an error.
    */
   fun lineRange(feedbackId: String): Pair<Int, Int>? {
-    val marker = synchronized(lock) { markers[feedbackId] } ?: return null
+    val anchor = synchronized(lock) { anchors[feedbackId] } ?: return null
     return ReadAction.compute<Pair<Int, Int>?, RuntimeException> {
-      if (!marker.isValid) return@compute null
-      linesFor(marker.document, marker.startOffset, marker.endOffset)
+      if (!anchor.marker.isValid) return@compute null
+      linesFor(anchor.document, anchor.marker.startOffset, anchor.marker.endOffset)
     }
   }
 
@@ -133,17 +141,18 @@ class AnchorRegistry(private val project: Project) : Disposable {
       return
     }
 
-    val live = synchronized(lock) { markers.toMap() }
+    val live = synchronized(lock) { anchors.toMap() }
     val known = store.all().mapTo(mutableSetOf()) { it.id }
     val moved = mutableMapOf<String, Pair<Int, Int>>()
 
-    for ((id, marker) in live) {
+    for ((id, anchor) in live) {
       if (id !in known) {
         drop(id)
         continue
       }
       val lines = ReadAction.compute<Pair<Int, Int>?, RuntimeException> {
-        if (marker.isValid) linesFor(marker.document, marker.startOffset, marker.endOffset) else null
+        val marker = anchor.marker
+        if (marker.isValid) linesFor(anchor.document, marker.startOffset, marker.endOffset) else null
       }
       if (lines == null) {
         // An invalid marker means its range was deleted outright. Leave the stored lines alone and
@@ -167,7 +176,7 @@ class AnchorRegistry(private val project: Project) : Disposable {
 
   /** True when [feedbackId] currently has a marker the platform still considers valid. */
   fun isAnchored(feedbackId: String): Boolean =
-    synchronized(lock) { markers[feedbackId] }?.isValid == true
+    synchronized(lock) { anchors[feedbackId] }?.marker?.isValid == true
 
   private fun isAnchorable(feedback: Feedback): Boolean =
     feedback.scope == Scope.SELECTION &&
@@ -188,35 +197,30 @@ class AnchorRegistry(private val project: Project) : Disposable {
     return first
   }
 
-  private fun put(feedbackId: String, marker: RangeMarker) {
-    val replaced = synchronized(lock) { markers.put(feedbackId, marker) }
+  private fun put(feedbackId: String, marker: RangeMarker, document: Document) {
+    val replaced = synchronized(lock) { anchors.put(feedbackId, Anchor(marker, document)) }
     replaced?.let { retire(it) }
   }
 
   private fun drop(feedbackId: String) {
-    val removed = synchronized(lock) { markers.remove(feedbackId) } ?: return
+    val removed = synchronized(lock) { anchors.remove(feedbackId) } ?: return
     retire(removed)
   }
 
   /**
    * Disposes a marker and stops watching its document once nothing else is anchored there.
    *
-   * The document is read before the marker is disposed: a disposed marker is not required to still
-   * know where it lived.
+   * Touches no model state, so it is safe from the store's flush thread, which holds no read
+   * lock - that is why the document travels with the marker instead of being read back from it.
    */
-  private fun retire(marker: RangeMarker) {
-    val document = try {
-      marker.document
-    } catch (e: ProcessCanceledException) {
-      throw e
-    } catch (e: Exception) {
-      null
-    }
-    marker.dispose()
-    if (document == null) return
-
+  private fun retire(anchor: Anchor) {
+    anchor.marker.dispose()
     val watcher = synchronized(lock) {
-      if (markers.values.any { it.document === document }) null else watchers.remove(document)
+      if (anchors.values.any { it.document === anchor.document }) {
+        null
+      } else {
+        watchers.remove(anchor.document)
+      }
     }
     watcher?.let { Disposer.dispose(it) }
   }
@@ -291,8 +295,8 @@ class AnchorRegistry(private val project: Project) : Disposable {
 
   override fun dispose() {
     synchronized(lock) {
-      markers.values.forEach { it.dispose() }
-      markers.clear()
+      anchors.values.forEach { it.marker.dispose() }
+      anchors.clear()
       watchers.clear()
     }
   }

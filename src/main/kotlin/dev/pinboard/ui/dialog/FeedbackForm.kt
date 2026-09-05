@@ -1,6 +1,5 @@
 package dev.pinboard.ui.dialog
 
-import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBTextArea
@@ -8,9 +7,9 @@ import com.intellij.util.ui.JBFont
 import com.intellij.util.ui.JBUI
 import dev.pinboard.capture.SelectionSnapshot
 import dev.pinboard.ui.theme.PinboardColors
+import dev.pinboard.ui.theme.PinboardFonts
 import java.awt.BorderLayout
 import java.awt.Dimension
-import java.awt.Font
 import java.awt.Graphics
 import java.awt.Graphics2D
 import java.awt.RenderingHints
@@ -84,7 +83,7 @@ class FeedbackForm(
       isEditable = false
       isFocusable = false
       isOpaque = false
-      font = editorFont()
+      font = PinboardFonts.editor()
       border = JBUI.Borders.empty(4, 12, 4, 6)
     }
     return QuoteFrame().apply {
@@ -101,11 +100,6 @@ class FeedbackForm(
       preferredSize = Dimension(JBUI.scale(NOTE_WIDTH), JBUI.scale(SNIPPET_HEIGHT))
       maximumSize = Dimension(Int.MAX_VALUE, JBUI.scale(SNIPPET_HEIGHT))
     }
-  }
-
-  private fun editorFont(): Font {
-    val scheme = EditorColorsManager.getInstance().globalScheme
-    return Font(scheme.editorFontName, Font.PLAIN, JBUI.scale(12))
   }
 
   /** The quote frame: a soft ground with the status colour running down its left edge. */

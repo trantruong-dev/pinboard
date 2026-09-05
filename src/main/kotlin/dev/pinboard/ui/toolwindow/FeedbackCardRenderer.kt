@@ -1,16 +1,15 @@
 package dev.pinboard.ui.toolwindow
 
-import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.ui.components.JBLabel
 import com.intellij.util.ui.JBFont
 import com.intellij.util.ui.JBUI
 import dev.pinboard.model.Scope
 import dev.pinboard.ui.theme.PinboardColors
+import dev.pinboard.ui.theme.PinboardFonts
 import dev.pinboard.util.FilePaths
 import java.awt.BorderLayout
 import java.awt.Color
 import java.awt.Component
-import java.awt.Font
 import java.awt.Graphics
 import java.awt.Graphics2D
 import java.awt.RenderingHints
@@ -123,7 +122,7 @@ class FeedbackCardRenderer : ListCellRenderer<FeedbackRow> {
         JBLabel(escaped(truncate(snippet, SNIPPET_CHARS))).apply {
           // Editor font: this is code, and setting it apart from the note is what makes a glance
           // enough to tell which is which.
-          font = editorFont()
+          font = PinboardFonts.editor()
           foreground = PinboardColors.textMuted
           alignmentX = Component.LEFT_ALIGNMENT
         },
@@ -157,11 +156,6 @@ class FeedbackCardRenderer : ListCellRenderer<FeedbackRow> {
 
   private fun rowBackground(selected: Boolean): Color =
     if (selected) PinboardColors.selectionBg else PinboardColors.surface
-
-  private fun editorFont(): Font {
-    val scheme = EditorColorsManager.getInstance().globalScheme
-    return Font(scheme.editorFontName, Font.PLAIN, JBUI.scale(11))
-  }
 
   /** `Foo.kt:40-52` for selections, `Foo.kt` for whole files, nothing for project scope. */
   private fun location(node: FeedbackItemNode): String? {

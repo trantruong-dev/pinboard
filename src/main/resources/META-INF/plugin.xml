@@ -55,7 +55,9 @@
     <!-- The button that floats over a selection. A group of its own because the platform addresses
          a floating toolbar by group id, and because keeping it separate means the floating button
          can be dropped without touching the action itself. -->
-    <group id="Pinboard.FloatingToolbar">
+    <group id="Pinboard.FloatingToolbar"
+           text="Pinboard Floating Toolbar"
+           description="The button Pinboard floats over a selected block of code">
       <reference ref="dev.pinboard.CaptureSelection"/>
     </group>
   </actions>
