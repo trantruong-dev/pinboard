@@ -82,6 +82,12 @@ In Claude Code:
 Or copy [`skills/pinboard/SKILL.md`](skills/pinboard/SKILL.md) to `~/.claude/skills/pinboard/SKILL.md`
 by hand, which works on any version.
 
+**Other agents work too.** The tools live on the IDE's MCP server, not on anything Claude-specific.
+The IDE auto-configures Claude Code, Claude Desktop, Cursor, VS Code and Windsurf; every other client
+gets a **Copy SSE Config** / **Copy Stdio Config** button on the same settings page. Paste the body
+of `SKILL.md` into whatever standing-instructions file your client reads. See
+[the user guide](docs/user-guide.md#5b-agents-other-than-claude-code) for the details.
+
 ## Documentation
 
 - **[User guide](docs/user-guide.md)** - install, connect an agent, everyday use, troubleshooting

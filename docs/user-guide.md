@@ -136,12 +136,95 @@ Copy [`skills/pinboard/SKILL.md`](../skills/pinboard/SKILL.md) from this reposit
 
 Create the directories if they do not exist. This works on every version of Claude Code.
 
-### Other agents
+---
 
-Any MCP client can call the tools without a skill - the skill only teaches *when* to reach for
-them. For a client that has no skill mechanism, paste the contents of `SKILL.md` into your system
-prompt or project instructions, or simply tell the agent to *"check the pinboard"* when you want it
-to look.
+## 5b. Agents other than Claude Code
+
+**Nothing about Pinboard is Claude-specific.** The plugin adds its tools to the MCP server your IDE
+already runs, so any MCP client that connects to that server gets all seven tools, with no
+Pinboard-side configuration at all. The skill is only a convenience for teaching an agent *when* to
+reach for them.
+
+There are two steps for any client: connect it, then tell it when to look.
+
+### Step 1 - connect the client to the IDE
+
+Open the IDE's MCP settings (**Settings | Tools | MCP Server** in 2025.2,
+**Settings | Tools | Client Auto-Configuration** in 2026.x).
+
+**Clients the IDE configures for you.** In 2025.2 the bundled MCP Server plugin ships dedicated
+support for:
+
+- Claude Code
+- Claude Desktop
+- Cursor
+- VS Code
+- Windsurf
+
+One click and the IDE writes the config file for that client itself. Newer IDE versions may add
+more, so trust the list on that settings page over this one.
+
+**Every other client.** The same page has a **Manual Client Configuration** entry with two buttons:
+
+| Button | Use it when |
+|---|---|
+| **Copy SSE Config** | Your client speaks MCP over SSE. Prefer this if it supports both |
+| **Copy Stdio Config** | Your client only speaks MCP over stdio |
+
+Paste the copied block into wherever your client keeps its MCP servers. This is the standard MCP
+config shape, so it drops into Cline, Continue, Zed, Codex CLI, Gemini CLI, JetBrains Junie, a
+homemade client, or anything else that speaks MCP.
+
+**Restart the client afterwards.** Most clients only read their MCP config at startup.
+
+If the IDE shows a *"MCP clients detected"* notification, it has spotted a client on your machine
+and is offering to configure it - that is the same thing, just initiated by the IDE.
+
+### Step 2 - tell the client when to use the tools
+
+The skill file is plain Markdown. Everything below its `---` frontmatter is client-agnostic prose:
+copy that body into whatever file your client reads as standing instructions.
+
+| Client | Where its project instructions live |
+|---|---|
+| Cursor | `.cursor/rules/` |
+| Windsurf | `.windsurf/rules/` |
+| VS Code + GitHub Copilot | `.github/copilot-instructions.md` |
+| Cline | `.clinerules/` |
+| JetBrains Junie | `.junie/guidelines.md` |
+| Codex CLI and a growing number of others | `AGENTS.md` in the project root |
+
+These paths move between versions - check your client's own documentation if one does not take
+effect. The content you paste is the same in every case.
+
+**If your client has no instructions file at all**, nothing is lost. Just say it in chat when you
+want the queue picked up:
+
+> *"Check the pinboard and work through anything pending."*
+
+The tools are discoverable on their own; the instructions only save you from repeating yourself.
+
+### Two things that bite non-Claude clients
+
+**Tool names are usually prefixed.** Your client may expose `feedback_list` as
+`mcp__idea__feedback_list`, `idea.feedback_list`, or similar, depending on how it namespaces
+servers. If an agent reports that `feedback_watch` does not exist, it is almost always looking for
+the bare name. Tell it to match on the `feedback_` part.
+
+**`feedback_watch` blocks on purpose, and clients disagree about how long they will wait.** It holds
+the connection open until new items arrive, which is what makes batching work without polling. The
+IDE will happily block for minutes, but your MCP client will give up first and the call is lost. Its
+`timeoutSeconds` parameter defaults to 60 seconds for that reason. If your client times out sooner:
+
+- lower `timeoutSeconds` to fit, or
+- skip `feedback_watch` entirely and use `feedback_list`, which returns immediately.
+
+Polling with `feedback_list` costs nothing but a round trip and works on every client.
+
+### Checking it worked
+
+Whatever the client, the test is the same: get it to call any Pinboard tool once, then look at the
+chip in the tool window. If it says **Agent active**, the client is through.
 
 ---
 

@@ -137,11 +137,93 @@ Copy file [`skills/pinboard/SKILL.md`](../skills/pinboard/SKILL.md) trong reposi
 
 Tự tạo thư mục nếu chưa có. Cách này chạy được trên mọi phiên bản Claude Code.
 
-### Các agent khác
+---
 
-Mọi MCP client đều gọi được các tool mà không cần skill - skill chỉ dạy *khi nào* nên dùng. Với client
-không có cơ chế skill, hãy dán nội dung `SKILL.md` vào system prompt hoặc phần hướng dẫn của project,
-hoặc đơn giản là bảo agent *"kiểm tra pinboard đi"* khi bạn muốn nó xem.
+## 5b. Các agent khác ngoài Claude Code
+
+**Pinboard không hề gắn riêng với Claude.** Plugin gắn các tool của nó vào MCP server mà IDE vốn đã
+chạy, nên bất kỳ MCP client nào kết nối được tới server đó đều nhận đủ bảy tool, và không phải cấu
+hình gì thêm ở phía Pinboard. Skill chỉ là thứ tiện lợi để dạy agent biết *khi nào* cần dùng.
+
+Với client nào cũng chỉ có hai bước: kết nối, rồi bảo nó khi nào cần xem.
+
+### Bước 1 - kết nối client với IDE
+
+Mở phần cài đặt MCP của IDE (**Settings | Tools | MCP Server** ở bản 2025.2, hoặc
+**Settings | Tools | Client Auto-Configuration** ở bản 2026.x).
+
+**Những client IDE tự cấu hình giúp bạn.** Ở bản 2025.2, plugin MCP Server đi kèm hỗ trợ sẵn:
+
+- Claude Code
+- Claude Desktop
+- Cursor
+- VS Code
+- Windsurf
+
+Chỉ cần một cú nhấp là IDE tự ghi file cấu hình cho client đó. Các bản IDE mới hơn có thể thêm client
+khác, nên hãy tin vào danh sách hiển thị trên trang cài đặt hơn là danh sách ở đây.
+
+**Mọi client còn lại.** Cũng trên trang đó có mục **Manual Client Configuration** với hai nút:
+
+| Nút | Dùng khi nào |
+|---|---|
+| **Copy SSE Config** | Client của bạn nói MCP qua SSE. Nếu client hỗ trợ cả hai thì ưu tiên cách này |
+| **Copy Stdio Config** | Client của bạn chỉ nói MCP qua stdio |
+
+Dán khối cấu hình vừa copy vào nơi client lưu danh sách MCP server. Đây là định dạng cấu hình MCP tiêu
+chuẩn, nên dán được vào Cline, Continue, Zed, Codex CLI, Gemini CLI, JetBrains Junie, hay bất kỳ client
+tự viết nào nói được MCP.
+
+**Nhớ khởi động lại client sau khi cấu hình.** Đa số client chỉ đọc cấu hình MCP lúc khởi động.
+
+Nếu IDE hiện thông báo *"MCP clients detected"*, nghĩa là nó đã phát hiện một client trên máy bạn và
+đang đề nghị cấu hình giúp - cũng chính là việc trên, chỉ khác là do IDE chủ động.
+
+### Bước 2 - bảo client khi nào cần dùng các tool
+
+File skill là Markdown thuần. Toàn bộ phần nằm dưới khối frontmatter `---` là văn bản không phụ thuộc
+client: cứ copy phần thân đó vào file mà client của bạn đọc làm hướng dẫn thường trực.
+
+| Client | Nơi đặt hướng dẫn cho project |
+|---|---|
+| Cursor | `.cursor/rules/` |
+| Windsurf | `.windsurf/rules/` |
+| VS Code + GitHub Copilot | `.github/copilot-instructions.md` |
+| Cline | `.clinerules/` |
+| JetBrains Junie | `.junie/guidelines.md` |
+| Codex CLI và ngày càng nhiều client khác | `AGENTS.md` ở thư mục gốc project |
+
+Các đường dẫn này thay đổi theo phiên bản - nếu một cách không có tác dụng, hãy xem tài liệu của chính
+client đó. Nội dung bạn dán vào thì trường hợp nào cũng như nhau.
+
+**Nếu client của bạn không có file hướng dẫn nào cả** thì cũng không sao. Cứ nói thẳng trong khung chat
+khi bạn muốn nó xử lý hàng đợi:
+
+> *"Kiểm tra pinboard và làm hết những mục đang chờ."*
+
+Các tool tự nó đã hiện ra cho agent thấy; phần hướng dẫn chỉ giúp bạn khỏi phải nhắc đi nhắc lại.
+
+### Hai điều hay gây vướng với client không phải Claude
+
+**Tên tool thường bị thêm tiền tố.** Client của bạn có thể hiển thị `feedback_list` thành
+`mcp__idea__feedback_list`, `idea.feedback_list`, hoặc tương tự, tùy cách nó đặt namespace cho server.
+Nếu agent báo không có `feedback_watch`, gần như chắc chắn là nó đang tìm đúng tên trần. Hãy bảo nó
+khớp theo phần `feedback_`.
+
+**`feedback_watch` cố ý chặn lại, và mỗi client chịu chờ một khoảng khác nhau.** Nó giữ kết nối mở cho
+đến khi có mục mới, và đó chính là thứ giúp gom lô mà không cần hỏi liên tục. IDE sẵn sàng chờ vài
+phút, nhưng MCP client thường bỏ cuộc trước và lệnh gọi bị mất. Vì vậy tham số `timeoutSeconds` mặc
+định là 60 giây. Nếu client của bạn hết giờ sớm hơn:
+
+- giảm `timeoutSeconds` cho vừa, hoặc
+- bỏ hẳn `feedback_watch` và dùng `feedback_list`, vì lệnh này trả về ngay lập tức.
+
+Hỏi định kỳ bằng `feedback_list` chỉ tốn thêm một lượt qua lại và chạy được trên mọi client.
+
+### Kiểm tra xem đã chạy chưa
+
+Với client nào thì cách kiểm tra cũng giống nhau: bảo nó gọi thử một tool bất kỳ của Pinboard, rồi nhìn
+con chip trên tool window. Nếu chip báo **Agent active** thì client đã thông.
 
 ---
 

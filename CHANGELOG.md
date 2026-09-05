@@ -4,7 +4,8 @@
 
 ### Added
 
-- User guide in English and Vietnamese under `docs/`.
+- User guide in English and Vietnamese under `docs/`, including how to connect agents other than
+  Claude Code and where each client keeps its standing instructions.
 - Claude Code plugin manifest, so the skill installs with `/plugin marketplace add
   trantruong-dev/pinboard` instead of being copied by hand.
 
