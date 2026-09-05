@@ -6,14 +6,21 @@
 #
 # Recipes stay free of shell-specific syntax on purpose - see the note on GRADLE below.
 
-# How the Gradle wrapper has to be spelled depends on the shell make picked, and on Windows that is
-# not always the shell you typed `make` into: GNU make falls back to cmd.exe when it finds no sh on
-# PATH, even from Git Bash, and cmd reads the leading dot of "./gradlew" as a command of its own.
-# Both spellings were run under both shells to confirm each works only where it is used here.
-ifeq ($(findstring sh,$(notdir $(SHELL))),sh)
-  GRADLE ?= ./gradlew
-else
+# Which shell runs the recipes is pinned here rather than left to make, and the Gradle wrapper is
+# spelled to match it.
+#
+# On Windows, make left to itself picks cmd.exe or a POSIX sh depending on what it finds on PATH -
+# not on the shell you typed `make` into, and not consistently between runs on one machine. cmd
+# reads the leading dot of "./gradlew" as a command of its own and fails, so guessing wrong breaks
+# every target. Asking make which shell it holds does not settle it either: it reported sh while
+# still running the recipe through cmd. Naming the shell removes the guess.
+#
+# Nothing below needs a POSIX shell, which is what makes cmd an acceptable answer here.
+ifeq ($(OS),Windows_NT)
+  SHELL := cmd.exe
   GRADLE ?= .\gradlew.bat
+else
+  GRADLE ?= ./gradlew
 endif
 
 # Narrows `make test` to one class or method, e.g.

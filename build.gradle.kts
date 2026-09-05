@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "dev.pinboard"
-version = "0.1.0-SNAPSHOT"
+version = "0.0.1"
 
 dependencies {
   intellijPlatform {
@@ -63,7 +63,8 @@ intellijPlatform {
     """.trimIndent()
     version = project.version.toString()
     vendor {
-      name = "Pinboard"
+      name = "Trần Quang Trường"
+      url = "https://github.com/trantruong-dev/pinboard"
     }
     ideaVersion {
       // No untilBuild on purpose: pinning it locks the plugin out every time an IDE ships a new
@@ -112,7 +113,9 @@ intellijPlatform {
 changelog {
   version = project.version.toString()
   path = file("CHANGELOG.md").canonicalPath
-  header = provider { "[${version.get()}] - ${org.jetbrains.changelog.date()}" }
+  // No brackets around the version: repositoryUrl makes the plugin bracket it itself to build the
+  // compare link, and bracketing it here too renders the heading as [[0.0.1]].
+  header = provider { "${version.get()} - ${org.jetbrains.changelog.date()}" }
   groups = listOf("Added", "Changed", "Deprecated", "Removed", "Fixed", "Security")
   repositoryUrl = "https://github.com/trantruong-dev/pinboard"
 }
