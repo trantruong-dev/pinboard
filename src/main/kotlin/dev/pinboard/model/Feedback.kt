@@ -27,6 +27,8 @@ data class Feedback(
 ) {
   fun copyWithStatus(newStatus: Status): Feedback = copy(status = newStatus, updatedAt = System.currentTimeMillis())
 
+  fun copyWithNote(newNote: String): Feedback = copy(note = newNote, updatedAt = System.currentTimeMillis())
+
   fun copyWithMessage(newMessage: Message): Feedback =
     copy(thread = thread + newMessage, updatedAt = System.currentTimeMillis())
 }

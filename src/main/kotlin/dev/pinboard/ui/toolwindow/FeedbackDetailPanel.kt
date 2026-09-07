@@ -11,11 +11,11 @@ import com.intellij.util.text.DateFormatUtil
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.SwingHelper
 import com.intellij.util.ui.UIUtil
-import dev.pinboard.capture.SelectionSnapshot
 import dev.pinboard.model.Author
 import dev.pinboard.model.Feedback
 import dev.pinboard.model.Scope
 import dev.pinboard.ui.dialog.CodePreviewPanel
+import dev.pinboard.ui.toSnapshot
 import dev.pinboard.ui.theme.PinboardFonts
 import java.awt.BorderLayout
 import javax.swing.JComponent
@@ -160,16 +160,3 @@ class FeedbackDetailPanel(
     disposePreview()
   }
 }
-
-/** Adapts a stored item back to the shape [CodePreviewPanel] renders. */
-private fun Feedback.toSnapshot(): SelectionSnapshot = SelectionSnapshot(
-  filePath = filePath,
-  language = language,
-  startLine = startLine,
-  endLine = endLine,
-  codeSnapshot = codeSnapshot,
-  contentSha256 = contentSha256,
-  truncated = truncated,
-  symbolPath = symbolPath,
-  vcsRevision = vcsRevision,
-)

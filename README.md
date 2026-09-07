@@ -55,6 +55,12 @@ the editor to re-read the code does not.
 **Pin a whole file.** Right-click the file in the Project view or its editor tab, **Pin File for
 Agent**.
 
+**Fix a note you already pinned.** While an item is still pending, select it in the tool window and
+press `F2`, click **Edit**, or use the row's context menu. Once the agent has acknowledged the item
+the note is locked: it is already working from those words, and changing them underneath it is how
+the two of you end up acting on different instructions. Only the wording is editable - the pinned
+code is what it was.
+
 **See your pins in the code.** A pinned range is tinted, marked in the error stripe, and carries a
 pin in the gutter that brings the queue forward. Any file with open feedback gets a faint wash on
 its tab. Editing above a pin moves it with the code rather than reporting it stale.

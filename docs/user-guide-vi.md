@@ -282,6 +282,30 @@ Một bong bóng mở ra ngay tại con trỏ. Gõ ghi chú rồi nhấn **`Ctrl
 Chuột phải vào file trong khung **Project**, hoặc chuột phải vào **tab editor** của file, chọn
 **Pin File for Agent**. Dùng cách này cho những ghi chú về cả file chứ không phải một dòng cụ thể.
 
+### Sửa lại ghi chú đã ghim
+
+Gõ sai một chữ, hay viết chưa rõ ý? Chừng nào mục đó còn ở trạng thái **pending**, chọn nó trong
+tool window rồi làm một trong ba cách:
+
+- Bấm **`F2`**
+- Bấm nút **Edit** trên thanh công cụ
+- Chuột phải vào dòng, chọn **Edit**
+
+Đúng khung nhập đó mở lại, ghi chú cũ đã điền sẵn, kèm đoạn code bạn đã ghim. **`Ctrl+Enter`** để
+lưu, **Esc** để bỏ qua.
+
+Hai giới hạn, đều là cố ý:
+
+- **Chỉ sửa được chữ.** Vùng code đã ghim và bản chụp lúc ghim giữ nguyên. Muốn trỏ ghi chú sang
+  đoạn code khác thì xoá đi ghim lại.
+- **Mục đã acknowledged thì khoá.** Một khi agent báo đã đọc, nó đang làm theo đúng những chữ nó
+  đọc được. Sửa chữ dưới chân nó là cách chắc chắn nhất để hai bên làm theo hai chỉ dẫn khác nhau.
+  Trường hợp đó hãy nhắn cho agent chứ đừng sửa pin.
+
+Có một khe hẹp nên biết: agent có thể *đọc* một mục pending trước khi acknowledge nó. Nếu bạn sửa
+ghi chú lúc agent đang chạy giữa chừng thì nó có thể đã cầm bản chữ cũ. Còn nếu bạn sửa đúng lúc nó
+acknowledge, thay đổi sẽ bị từ chối và Pinboard báo cho bạn biết chứ không im lặng nuốt mất.
+
 ### Nhìn thấy pin ngay trong code
 
 Một vùng đã ghim sẽ:
@@ -304,6 +328,7 @@ Tool window **Pinboard** bên phải hiển thị hàng đợi dưới dạng th
 |---|---|
 | Nhảy về đoạn code đã ghim | Nhấp đúp vào thẻ, hoặc chọn thẻ rồi nhấn **Enter** |
 | Gập hoặc mở một nhóm trạng thái | Bấm vào tiêu đề nhóm |
+| Sửa ghi chú đang pending | Phím **F2**, nút trên thanh công cụ, hoặc menu chuột phải của thẻ |
 | Xóa một mục | Phím **Del**, nút trên thanh công cụ, hoặc menu chuột phải của thẻ |
 | Xóa hàng loạt việc đã xong | Menu **Clear**: *Clear resolved*, *Clear dismissed* |
 | Xóa sạch | **Delete All** - có hỏi lại, vì không hoàn tác được |
@@ -332,6 +357,9 @@ ra khỏi tầm nhìn.
 
 **Acknowledged không có nghĩa là xong.** Nếu agent khởi động lại giữa chừng, các mục acknowledged
 chính là những việc nó đã bắt đầu; một agent làm đúng sẽ quay lại làm tiếp.
+
+**Pending cũng là cửa sổ để bạn đổi ý về câu chữ.** Mốc acknowledge là hạn chót: sau đó ghi chú
+bị khoá. Xem mục *Sửa lại ghi chú đã ghim* ở trên.
 
 ### Khi code thay đổi bên dưới một pin
 

@@ -4,6 +4,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.CommonShortcuts
+import com.intellij.openapi.actionSystem.CustomShortcutSet
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
@@ -141,11 +142,12 @@ class FeedbackListPanel(
   }
 
   /**
-   * Delete is reachable three ways on purpose: the toolbar button, the Del key, and the row's own
-   * context menu. A docked tool window is narrow enough that the toolbar can be the first thing
-   * clipped, and right-clicking a row is what the platform trains users to try.
+   * Edit and Delete are each reachable three ways on purpose: the toolbar button, a key, and the
+   * row's own context menu. A docked tool window is narrow enough that the toolbar can be the
+   * first thing clipped, and right-clicking a row is what the platform trains users to try.
    */
   private fun buildActionGroup() = DefaultActionGroup(
+    EditFeedbackAction(project, FeedbackSelection { selectedFeedback() }),
     DeleteFeedbackAction(project, FeedbackSelection { selectedFeedback() }),
     ClearFeedbackActionGroup(project),
   )
@@ -155,6 +157,17 @@ class FeedbackListPanel(
     PopupHandler.installPopupMenu(list, group, ActionPlaces.TOOLWINDOW_POPUP)
     DeleteFeedbackAction(project, FeedbackSelection { selectedFeedback() })
       .registerCustomShortcutSet(CommonShortcuts.getDelete(), list, this)
+    // F2 literally, not CommonShortcuts.getRename(): that resolves to the RenameElement
+    // refactoring, which the default keymap binds to Shift+F6. F2 is what the platform's own
+    // in-list renames use (shelved changes, local branches, commit reword), and it is the gesture
+    // for "change the words on the row I have selected". Enter and double-click are already
+    // spoken for by navigation.
+    EditFeedbackAction(project, FeedbackSelection { selectedFeedback() })
+      .registerCustomShortcutSet(
+        CustomShortcutSet(KeyStroke.getKeyStroke(KeyEvent.VK_F2, 0)),
+        list,
+        this,
+      )
   }
 
   /**

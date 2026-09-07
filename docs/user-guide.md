@@ -285,6 +285,31 @@ Right-click the file in the **Project** view, or right-click its **editor tab**,
 **Pin File for Agent**. Use this for notes that are about the file as a whole rather than a
 particular line.
 
+### Fixing a note you already pinned
+
+Spotted a typo, or worded it badly? While the item is still **pending**, select it in the tool
+window and do any one of:
+
+- Press **`F2`**
+- Click **Edit** on the toolbar
+- Right-click the row and choose **Edit**
+
+The same box reopens with your note in it, alongside the code you pinned. **`Ctrl+Enter`** saves,
+**Esc** leaves it alone.
+
+Two limits, both deliberate:
+
+- **Only the wording is editable.** The pinned lines and the snapshot taken at capture time stay as
+  they were. To point a note at different code, delete it and pin again.
+- **Acknowledged items are locked.** Once the agent has said it has seen an item, it is working
+  from the words it read. Rewriting them underneath it is the reliable way to end up with the two
+  of you acting on different instructions. Reply to the agent instead.
+
+There is a narrow gap here worth knowing about: an agent can *read* a pending item before it
+acknowledges it. If you edit a note while the agent is mid-run, it may already have the old
+wording. If you edit at the moment it acknowledges, the change is refused and Pinboard tells you so
+rather than silently dropping it.
+
 ### Seeing your pins in the code
 
 A pinned range is:
@@ -307,6 +332,7 @@ The **Pinboard** tool window on the right shows the queue as cards, grouped by s
 |---|---|
 | Jump back to the pinned code | Double-click a card, or select it and press **Enter** |
 | Fold or unfold a status group | Click the status header |
+| Edit a pending note | **F2**, the toolbar button, or the card's right-click menu |
 | Delete one item | **Del**, the toolbar button, or the card's right-click menu |
 | Delete finished work in bulk | **Clear** dropdown: *Clear resolved*, *Clear dismissed* |
 | Delete everything | **Delete All** - it asks first, because it cannot be undone |
@@ -335,6 +361,9 @@ push pending items out of view.
 
 **Acknowledged is not done.** If an agent restarts mid-task, acknowledged items are the ones it had
 already started; a well-behaved agent picks them back up.
+
+**Pending is also your window to change your mind about the wording.** Acknowledgement is the
+deadline: after it, the note is locked. See *Fixing a note you already pinned* above.
 
 ### When code changes underneath a pin
 

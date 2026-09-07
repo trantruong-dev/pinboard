@@ -29,12 +29,20 @@ import javax.swing.ScrollPaneConstants
 class FeedbackForm(
   private val snapshot: SelectionSnapshot?,
   showLocation: Boolean = true,
+  initialNote: String = "",
 ) : JPanel() {
 
   val noteArea = JBTextArea(NOTE_ROWS, NOTE_COLUMNS).apply {
     lineWrap = true
     wrapStyleWord = true
     emptyText.text = "What should the agent do here?"
+    // Seeding through the constructor rather than letting callers reach into noteArea keeps the
+    // two capture paths from drifting: whatever prefill means, it means the same in both.
+    text = initialNote
+    // Reopening a note to edit it usually means adding to the end, not replacing it. Measured off
+    // the document rather than the string: this runs in a constructor, where a document that
+    // normalised the text would turn a mismatch into a throw.
+    caretPosition = document.length
   }
 
   init {

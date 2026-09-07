@@ -4,6 +4,10 @@
 
 ### Added
 
+- Edit the note on a pin that is still pending, from the tool window: `F2`, the toolbar button, or
+  the row's context menu. Locked once the agent acknowledges the item, since it is already working
+  from the words it read. Only the wording changes; the pinned code stays as captured.
+
 ### Changed
 
 ### Deprecated
