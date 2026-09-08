@@ -143,6 +143,70 @@ class FeedbackListModelTest {
   }
 
   @Test
+  fun pendingNodesCarriesOnlyPendingInGroupOrder() {
+    val model = modelOf(
+      listOf(
+        item("old", Status.PENDING, 100),
+        item("new", Status.PENDING, 200),
+        item("a", Status.ACKNOWLEDGED, 300),
+        item("r", Status.RESOLVED, 400),
+        item("d", Status.DISMISSED, 500),
+      ),
+    )
+    // Same order the Pending group renders in, so the copy reads the way the queue looks.
+    assertEquals(listOf("new", "old"), model.pendingNodes().map { it.feedback.id })
+  }
+
+  /** Folding is a view state. A folded group has no rows at all, so anything built from the rows
+   *  would copy nothing here - which is the whole reason this is built from the items instead. */
+  @Test
+  fun pendingNodesIgnoresFolding() {
+    val model = modelOf(listOf(item("p", Status.PENDING, 1), item("q", Status.PENDING, 2)))
+    val open = model.pendingNodes()
+
+    model.toggleCollapsed(Status.PENDING)
+
+    assertTrue(model.isCollapsed(Status.PENDING))
+    assertEquals(emptyList<FeedbackItemNode>(), itemsUnder(model, Status.PENDING))
+    assertEquals(open, model.pendingNodes())
+    assertEquals(2, model.pendingNodes().size)
+  }
+
+  @Test
+  fun pendingNodesCarriesTheResolvedStaleFlags() {
+    val model = modelOf(
+      listOf(item("a", Status.PENDING, 1)),
+      mapOf("a" to StaleFlags(stale = true, fileMissing = false)),
+    )
+    assertTrue(model.pendingNodes().single().stale)
+  }
+
+  /** The action asks the cheap question on every tick and the expensive one only when invoked, so
+   *  the two must never disagree about whether there is anything to copy. */
+  @Test
+  fun hasPendingAgreesWithPendingNodes() {
+    val cases = listOf(
+      emptyList(),
+      listOf(item("r", Status.RESOLVED, 1)),
+      listOf(item("p", Status.PENDING, 1)),
+      listOf(item("p", Status.PENDING, 1), item("a", Status.ACKNOWLEDGED, 2)),
+    )
+    for (items in cases) {
+      val model = modelOf(items)
+      assertEquals(items.toString(), model.pendingNodes().isNotEmpty(), model.hasPending())
+    }
+  }
+
+  @Test
+  fun pendingNodesIsEmptyWithNothingPending() {
+    assertEquals(emptyList<FeedbackItemNode>(), modelOf(emptyList()).pendingNodes())
+    assertEquals(
+      emptyList<FeedbackItemNode>(),
+      modelOf(listOf(item("r", Status.RESOLVED, 1))).pendingNodes(),
+    )
+  }
+
+  @Test
   fun emptyQueueProducesNoRows() {
     val model = modelOf(emptyList())
     assertEquals(0, model.size)

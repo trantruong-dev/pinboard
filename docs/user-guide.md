@@ -336,6 +336,7 @@ The **Pinboard** tool window on the right shows the queue as cards, grouped by s
 | Delete one item | **Del**, the toolbar button, or the card's right-click menu |
 | Copy one item as Markdown | **Copy** on the toolbar, the card's right-click menu, right-click inside the detail pane with nothing highlighted, or **Ctrl+C** with the list focused |
 | Copy just the text you highlighted | Drag over it, then **Copy Selection** from the right-click menu, or **Ctrl+C** |
+| Copy the whole pending queue | Hover **Copy**, then **Copy All Pending** |
 | Delete finished work in bulk | **Clear** dropdown: *Clear resolved*, *Clear dismissed* |
 | Delete everything | **Delete All** - it asks first, because it cannot be undone |
 
@@ -366,6 +367,27 @@ reads **Copy Selection**, and copies exactly that. Right-click with nothing high
 **Copy**, and copies the whole pin. The same rule applies to Ctrl+C: with the list focused it copies
 the item, with the caret inside a note or the code snapshot it copies your selection there, because
 the detail pane is not part of the list and its own selection wins.
+
+### Handing over the whole batch
+
+**Copy** is one entry with a submenu, the way **Clear** is: hover it and you get *Copy* for the
+selected pin and **Copy All Pending** for the queue.
+
+**Copy All Pending** copies every pending pin at once, as one Markdown document: a line saying how
+many there are, then each pin as its own section separated by a rule. It is the same rendering as
+the single-item Copy, joined - so a Markdown viewer shows them as separate items rather than one
+run-on block.
+
+This is the gesture the queue exists for. Pin five things while you read, then hand the batch to an
+agent that cannot reach the queue over MCP by pasting it into the chat.
+
+Pending only. Acknowledged means an agent already picked the item up, so including it would hand the
+same work over twice. Folding the Pending group does not change what gets copied - folding is about
+what you are looking at, not about what is in the queue.
+
+There is no keyboard shortcut for it, on purpose. Ctrl+C is the single-item copy, and this one puts
+every note and every captured snippet on the clipboard at once, secrets included if the lines you
+pinned held any. That is worth reaching for a menu.
 
 ---
 

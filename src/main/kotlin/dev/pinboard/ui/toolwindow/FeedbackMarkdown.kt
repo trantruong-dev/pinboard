@@ -40,6 +40,22 @@ object FeedbackMarkdown {
     return sections.joinToString("\n\n")
   }
 
+  /**
+   * Several items in one paste, for handing the batch to an agent that cannot read the queue over
+   * MCP. That handover is the gesture the queue was built for, and copying pins one at a time is
+   * not it.
+   *
+   * Empty in, empty out. Whether an empty clipboard is worth writing is the caller's decision, not
+   * this object's.
+   */
+  fun renderAll(nodes: List<FeedbackItemNode>): String {
+    if (nodes.isEmpty()) return ""
+    // Each item opens with `###`, so a `##` line above them reads as what contains them, and the
+    // rule between two items is what stops them running together in a Markdown viewer.
+    val preamble = "## ${nodes.size} pinned ${if (nodes.size == 1) "item" else "items"}"
+    return preamble + "\n\n" + nodes.joinToString(separator = "\n\n---\n\n") { render(it) }
+  }
+
   /** A missing file outranks a stale one: it is the stronger statement about the same doubt. */
   private fun meta(node: FeedbackItemNode): String {
     val suffix = when {

@@ -4,6 +4,12 @@
 
 ### Added
 
+- **Copy All Pending** puts the whole pending queue on the clipboard as one Markdown document, each
+  pin its own section under a horizontal rule. For handing a batch to an agent that has no MCP
+  access to the queue, which until now meant copying pins one at a time. Pending only: acknowledged
+  means an agent already has it. Disabled when nothing is pending, and deliberately without a
+  shortcut - it copies every note and every captured snippet at once.
+
 ### Changed
 
 - The thread an agent receives per item is capped at the 10 newest messages, each message body at
@@ -12,6 +18,10 @@
   its own context with nothing bounding it. This bounds what the agent wrote, not your note, which
   is still sent whole however long it is. Nothing is hidden from you either - the panel still shows
   the entire thread.
+
+- **Copy** is now one entry with a submenu, the way **Clear** already was: hover it for *Copy* and
+  *Copy All Pending*. Two Copy entries side by side could only be told apart by their labels, and
+  the toolbar shows icons alone.
 
 ### Deprecated
 

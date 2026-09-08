@@ -46,6 +46,14 @@ sealed interface FeedbackRow {
 class FeedbackListModel : AbstractListModel<FeedbackRow>() {
 
   private var rows: List<FeedbackRow> = emptyList()
+
+  /**
+   * What the last rebuild was given, kept because it is folding-independent where [rows] is not.
+   * [pendingNodes] is built from this, so it is read by actions and not only by a rebuild.
+   *
+   * Not volatile, and must stay that way round: rebuilds are computed on a pooled thread but
+   * applied through [setItems] on the EDT, which is also the only thread an action runs on.
+   */
   private var lastItems: List<Feedback> = emptyList()
   private var lastFlags: Map<String, StaleFlags> = emptyMap()
 
@@ -71,25 +79,53 @@ class FeedbackListModel : AbstractListModel<FeedbackRow>() {
   /** Every header currently in the list, in render order. */
   fun headers(): List<FeedbackRow.StatusHeader> = rows.filterIsInstance<FeedbackRow.StatusHeader>()
 
+  /**
+   * Every PENDING item, in the order the group shows them, with the staleness already resolved.
+   *
+   * Built from the last items rather than from [rows], because a collapsed group contributes no
+   * rows at all: anything reading the rows would quietly copy nothing the moment someone folded
+   * Pending. Folding is a view state and must not change what a copy contains.
+   *
+   * Reads the cached flags rather than resolving staleness, which hits the VFS and is done once per
+   * rebuild on a pooled thread. Callers here are actions, and actions run on the EDT.
+   */
+  fun pendingNodes(): List<FeedbackItemNode> = nodesOf(Status.PENDING)
+
+  /**
+   * Whether [pendingNodes] would return anything.
+   *
+   * Separate from it because an action's `update` runs on the EDT on every toolbar tick and only
+   * ever asks this question. Answering it by building the list would sort and allocate the whole
+   * pending queue several times a second, forever, to look at `isNotEmpty()`.
+   */
+  fun hasPending(): Boolean = lastItems.any { it.status == Status.PENDING }
+
+  /** One ordering for the group, so the list and a copy of it cannot disagree. */
+  private fun nodesOf(status: Status): List<FeedbackItemNode> =
+    lastItems.asSequence()
+      .filter { it.status == status }
+      .sortedByDescending { it.createdAt } // newest first inside a group
+      .map {
+        val f = lastFlags[it.id] ?: StaleFlags.NONE
+        FeedbackItemNode(it, f.stale, f.fileMissing)
+      }
+      .toList()
+
   private fun rebuild(items: List<Feedback>, flags: Map<String, StaleFlags>) {
     lastItems = items
     lastFlags = flags
 
     val newRows = mutableListOf<FeedbackRow>()
     for (status in GROUP_ORDER) {
-      val group = items.asSequence()
-        .filter { it.status == status }
-        .sortedByDescending { it.createdAt } // newest first inside a group
-        .toList()
-      if (group.isEmpty()) continue // an empty header is noise, not information
+      val total = items.count { it.status == status }
+      if (total == 0) continue // an empty header is noise, not information
 
       val isCollapsed = status in collapsed
-      newRows += FeedbackRow.StatusHeader(status, group.size, isCollapsed)
+      newRows += FeedbackRow.StatusHeader(status, total, isCollapsed)
+      // Counted before the nodes are built, so a folded group of 500 resolved items costs a count
+      // rather than 500 nodes nobody renders.
       if (!isCollapsed) {
-        group.forEach { feedback ->
-          val f = flags[feedback.id] ?: StaleFlags.NONE
-          newRows += FeedbackRow.Item(FeedbackItemNode(feedback, f.stale, f.fileMissing))
-        }
+        nodesOf(status).forEach { newRows += FeedbackRow.Item(it) }
       }
     }
 

@@ -332,6 +332,7 @@ Tool window **Pinboard** bên phải hiển thị hàng đợi dưới dạng th
 | Xóa một mục | Phím **Del**, nút trên thanh công cụ, hoặc menu chuột phải của thẻ |
 | Copy một mục dưới dạng Markdown | Nút **Copy** trên thanh công cụ, menu chuột phải của thẻ, chuột phải trong khung chi tiết khi không bôi đen gì, hoặc **Ctrl+C** khi danh sách đang được focus |
 | Copy đúng phần đang bôi đen | Bôi đen rồi chọn **Copy Selection** trong menu chuột phải, hoặc **Ctrl+C** |
+| Copy toàn bộ hàng đợi đang pending | Rê chuột vào **Copy**, rồi chọn **Copy All Pending** |
 | Xóa hàng loạt việc đã xong | Menu **Clear**: *Clear resolved*, *Clear dismissed* |
 | Xóa sạch | **Delete All** - có hỏi lại, vì không hoàn tác được |
 
@@ -362,6 +363,27 @@ trong menu hiện là **Copy Selection** và chỉ copy đúng phần đó. Bấ
 thì mục đó là **Copy** và copy nguyên pin. Ctrl+C cũng theo đúng quy tắc này: khi danh sách đang
 focus thì copy cả mục, khi con trỏ nằm trong ghi chú hoặc đoạn code thì copy phần bạn bôi đen ở đó -
 vì khung chi tiết không nằm trong danh sách, nên vùng chọn của riêng nó thắng.
+
+### Bàn giao nguyên cả lô
+
+**Copy** là một mục có submenu, giống **Clear**: rê chuột vào là ra *Copy* cho pin đang chọn và
+**Copy All Pending** cho cả hàng đợi.
+
+**Copy All Pending** copy mọi pin đang pending cùng lúc, thành một tài liệu Markdown: một dòng cho
+biết có bao nhiêu mục, rồi từng pin là một phần riêng, ngăn nhau bằng một đường kẻ ngang. Cách hiển
+thị từng mục giống hệt Copy một mục, chỉ là được nối lại - nên trình xem Markdown hiện chúng thành
+các mục tách bạch chứ không dính thành một khối liền.
+
+Đây chính là thao tác mà hàng đợi sinh ra để phục vụ. Ghim năm thứ trong lúc đọc code, rồi dán cả lô
+vào khung chat của một agent không truy cập được hàng đợi qua MCP.
+
+Chỉ lấy pending. Acknowledged nghĩa là đã có agent nhận mục đó rồi, nên đưa vào sẽ thành bàn giao
+cùng một việc hai lần. Gập nhóm Pending lại không làm thay đổi nội dung được copy - gập là chuyện bạn
+đang nhìn thấy gì, không phải chuyện trong hàng đợi có gì.
+
+Không có phím tắt cho thao tác này, và đó là cố ý. Ctrl+C đã dành cho copy một mục, còn thao tác này
+đưa mọi ghi chú và mọi đoạn code đã chụp lên clipboard cùng lúc - kể cả secrets, nếu những dòng bạn
+ghim có chứa. Chuyện đó đáng để phải mở menu ra chọn.
 
 ---
 
