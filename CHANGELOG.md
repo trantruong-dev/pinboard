@@ -4,6 +4,20 @@
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [0.0.4] - 2026-09-08
+
+### Added
+
 - Edit the note on a pin that is still pending, from the tool window: `F2`, the toolbar button, or
   the row's context menu. Locked once the agent acknowledges the item, since it is already working
   from the words it read. Only the wording changes; the pinned code stays as captured.
@@ -28,12 +42,6 @@
 
 - Folding or unfolding a status group no longer clears the selection and the detail panel. Expanding
   Resolved to glance at something used to deselect whatever you were reading.
-
-### Deprecated
-
-### Removed
-
-### Security
 
 ## [0.0.3] - 2026-09-05
 
@@ -92,7 +100,8 @@
   a re-pin.
 - Claude Code skill in `claude-skill/SKILL.md`.
 
-[Unreleased]: https://github.com/trantruong-dev/pinboard/compare/v0.0.3...HEAD
+[Unreleased]: https://github.com/trantruong-dev/pinboard/compare/v0.0.4...HEAD
+[0.0.4]: https://github.com/trantruong-dev/pinboard/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/trantruong-dev/pinboard/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/trantruong-dev/pinboard/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/trantruong-dev/pinboard/commits/v0.0.1
