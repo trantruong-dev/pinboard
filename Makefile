@@ -53,7 +53,7 @@ help:
 	@echo dist - build the installable zip into build/distributions
 	@echo publish - publish the current version to the JetBrains Marketplace
 	@echo changelog - roll the Unreleased section into the current version
-	@echo release - VERSION=0.0.3 ships it: bump, changelog, test, commit, tag, publish, push
+	@echo release - VERSION=0.0.3 ships it: bump, changelog, test, commit, tag, publish, push, GitHub release
 	@echo ci - everything CI runs: tests, the distribution, then the verifier
 	@echo clean - delete build output
 
@@ -95,8 +95,8 @@ changelog:
 #   make release VERSION=0.0.3
 #
 # Write what changed under `## [Unreleased]` in CHANGELOG.md first. That section is the release
-# notes: it becomes the [0.0.3] section here and the description on the Marketplace page. Releasing
-# with it empty ships a version with nothing to say for itself.
+# notes: it becomes the [0.0.3] section here, the description on the Marketplace page, and the body
+# of the GitHub release. Releasing with it empty ships a version with nothing to say for itself.
 #
 # Each Gradle line is its own invocation on purpose. project.version is read when the build is
 # configured, so patchChangelog and publishPlugin can only see the new number from an invocation
@@ -106,11 +106,23 @@ changelog:
 # leaves a local commit to retry or reset, instead of a tag on the remote announcing a release that
 # never reached the Marketplace. If the push is what fails, everything is already published and
 # committed - just push again.
+#
+# The GitHub release comes last, because it can only point at a tag the remote already has. It is
+# also the only step that is safe to repeat by hand, so if it is what fails, the two lines under it
+# are the whole recovery:
+#
+#   .\gradlew.bat writeReleaseNotes
+#   gh release create v0.0.3 --title "Pinboard 0.0.3" --notes-file build/release-notes.md --verify-tag
+#
+# gh is checked at the top rather than here. Finding out that it is missing after the plugin is
+# published, tagged and pushed leaves the release half-announced, which is the one state worth
+# spending an early second to avoid.
 release:
 	@$(if $(VERSION),,$(error VERSION is not set - run make release VERSION=0.0.3))
 	@$(if $(JETBRAINS_MARKETPLACE_TOKEN),,$(error JETBRAINS_MARKETPLACE_TOKEN is not set - export it before releasing))
 	@echo Releasing $(VERSION). The working tree must be clean and on the branch you release from.
 	git diff --quiet HEAD
+	gh auth status
 	$(GRADLE) checkReleaseNotes
 	$(GRADLE) setVersion -PnewVersion=$(VERSION)
 	$(GRADLE) patchChangelog
@@ -120,6 +132,8 @@ release:
 	git tag -a v$(VERSION) -m "Pinboard $(VERSION)"
 	$(GRADLE) publishPlugin
 	git push --follow-tags origin main
+	$(GRADLE) writeReleaseNotes
+	gh release create v$(VERSION) --title "Pinboard $(VERSION)" --notes-file build/release-notes.md --verify-tag
 
 ci:
 	$(GRADLE) test buildPlugin verifyPlugin $(if $(IDE),-PverifyIde=$(IDE),)
