@@ -162,7 +162,13 @@ class FeedbackListPanel(
   private fun buildActionGroup() = DefaultActionGroup(
     EditFeedbackAction(project, FeedbackSelection { selectedFeedback() }),
     DeleteFeedbackAction(project, FeedbackSelection { selectedFeedback() }),
-    CopyFeedbackAction(FeedbackNodeSelection { selectedNode() }),
+    CopyFeedbackActionGroup(
+      FeedbackNodeSelection { selectedNode() },
+      object : PendingFeedbackSupplier {
+        override fun pending() = listModel.pendingNodes()
+        override fun hasPending() = listModel.hasPending()
+      },
+    ),
     ClearFeedbackActionGroup(project),
   )
 
@@ -347,6 +353,12 @@ class FeedbackListPanel(
 
   /** Test hook: folds a group the way clicking its header does. */
   fun toggleGroupForTest(status: Status) = toggleGroup(status)
+
+  /**
+   * Test hook: the group the toolbar, the row menu and the detail menu are all built from, so a
+   * test can assert an entry reaches the user without going through a popup.
+   */
+  fun actionGroupForTest(): DefaultActionGroup = buildActionGroup()
 
   override fun dispose() {
     disposed = true

@@ -4,6 +4,7 @@ import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.PlatformDataKeys
 import com.intellij.openapi.ide.CopyPasteManager
 import java.awt.datatransfer.StringSelection
@@ -27,6 +28,28 @@ fun interface FeedbackNodeSelection {
  */
 internal fun selectedTextIn(component: Any?): String? =
   (component as? JTextComponent)?.selectedText?.takeIf { it.isNotEmpty() }
+
+/**
+ * The one Copy entry, holding both copies as a submenu the way [ClearFeedbackActionGroup] holds
+ * its three.
+ *
+ * Two Copy entries side by side could only be told apart by their labels, and the toolbar shows
+ * icons alone - two identical glyphs, on the bar this panel already treats as the first thing to be
+ * clipped when the tool window is narrow. Folding them into one entry costs a hover and buys back
+ * a slot.
+ */
+class CopyFeedbackActionGroup(
+  selection: FeedbackNodeSelection,
+  supplier: PendingFeedbackSupplier,
+) : DefaultActionGroup("Copy", true) {
+
+  init {
+    templatePresentation.icon = AllIcons.Actions.Copy
+    templatePresentation.description = "Copy this pin, or the whole pending queue, as Markdown"
+    add(CopyFeedbackAction(selection))
+    add(CopyAllPendingAction(supplier))
+  }
+}
 
 /**
  * Copies the pin, or the highlighted text when there is some.
@@ -64,4 +87,48 @@ class CopyFeedbackAction(
 
   private fun highlightedText(e: AnActionEvent): String? =
     selectedTextIn(e.getData(PlatformDataKeys.CONTEXT_COMPONENT))
+}
+
+/**
+ * Supplies the pending items to [CopyAllPendingAction].
+ *
+ * Separate from [FeedbackNodeSelection] because this is not a selection: the batch is whatever is
+ * pending, not whatever the user clicked.
+ */
+interface PendingFeedbackSupplier {
+  fun pending(): List<FeedbackItemNode>
+
+  /** Asked on every toolbar tick, so it must not cost what building the list costs. */
+  fun hasPending(): Boolean
+}
+
+/**
+ * Copies the whole pending queue as one Markdown document.
+ *
+ * The point of the queue is handing a cluster over, and an agent without MCP access to it can only
+ * be handed one by paste. Doing that today means copying pins one at a time.
+ *
+ * PENDING only. ACKNOWLEDGED means an agent already has the item, so including it would hand the
+ * same work over twice.
+ *
+ * No shortcut, deliberately. Ctrl+C is the single-item copy, and this puts every note and every
+ * captured snippet - secrets included, if the pinned lines held any - on the clipboard at once.
+ * That is worth a menu entry, not a reflex.
+ */
+class CopyAllPendingAction(
+  private val supplier: PendingFeedbackSupplier,
+) : AnAction("Copy All Pending", "Copy every pending pin as Markdown", AllIcons.Actions.Copy) {
+
+  override fun getActionUpdateThread() = ActionUpdateThread.EDT
+
+  override fun update(e: AnActionEvent) {
+    e.presentation.isEnabled = supplier.hasPending()
+  }
+
+  override fun actionPerformed(e: AnActionEvent) {
+    val text = FeedbackMarkdown.renderAll(supplier.pending())
+    // Nothing pending means nothing to hand over. Wiping the clipboard is not what was asked for.
+    if (text.isEmpty()) return
+    CopyPasteManager.getInstance().setContents(StringSelection(text))
+  }
 }

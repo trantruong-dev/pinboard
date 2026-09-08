@@ -1,5 +1,9 @@
 package dev.pinboard.ui.toolwindow
 
+import com.intellij.openapi.actionSystem.ActionPlaces
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.impl.SimpleDataContext
+import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.ui.content.ContentFactory
 import com.intellij.util.ui.UIUtil
@@ -7,6 +11,7 @@ import dev.pinboard.model.Feedback
 import dev.pinboard.model.Scope
 import dev.pinboard.model.Status
 import dev.pinboard.store.FeedbackStore
+import java.awt.datatransfer.DataFlavor
 
 class FeedbackListPanelTest : BasePlatformTestCase() {
 
@@ -64,6 +69,21 @@ class FeedbackListPanelTest : BasePlatformTestCase() {
 
   private fun selectedId(panel: FeedbackListPanel): String? =
     (panel.listForTest().selectedValue as? FeedbackRow.Item)?.node?.feedback?.id
+
+  private fun copyGroup(panel: FeedbackListPanel): CopyFeedbackActionGroup =
+    panel.actionGroupForTest().childActionsOrStubs.filterIsInstance<CopyFeedbackActionGroup>().single()
+
+  private fun event(): AnActionEvent =
+    AnActionEvent.createFromDataContext(
+      ActionPlaces.TOOLWINDOW_POPUP,
+      null,
+      SimpleDataContext.builder().build(),
+    )
+
+  private fun clipboardText(): String =
+    checkNotNull(
+      CopyPasteManager.getInstance().getContents<String>(DataFlavor.stringFlavor),
+    ) { "nothing on the clipboard" }
 
   fun testGroupsAndPendingBadgeReflectStore() {
     val store = FeedbackStore.getInstance(project)
@@ -241,6 +261,58 @@ class FeedbackListPanelTest : BasePlatformTestCase() {
     assertEquals(-1, indexOf(panel, "hide1"))
     assertNull(selectedId(panel))
     assertNotSame(shown, panel.detailForTest().getComponent(0))
+  }
+
+  /**
+   * The entry has to reach the user, and it reaches all three surfaces through this one group.
+   *
+   * Both copies live under a single "Copy" entry, so the top level must show one and not two - that
+   * is the whole point of the submenu, and two Copy entries is exactly what it exists to prevent.
+   */
+  fun testCopyEntriesAreOneSubmenu() {
+    val store = FeedbackStore.getInstance(project)
+    store.deleteAll()
+    store.add(item("p0"))
+
+    val panel = newPanel()
+    waitFor("initial render") { panel.pendingCountForTest() == 1 }
+
+    val top = panel.actionGroupForTest().childActionsOrStubs
+    assertEquals(listOf("Copy"), top.map { it.templatePresentation.text }.filter { it == "Copy" })
+    assertEquals(
+      listOf("Copy", "Copy All Pending"),
+      copyGroup(panel).childActionsOrStubs.map { it.templatePresentation.text },
+    )
+  }
+
+  /**
+   * The folding trap, through the real panel rather than the model alone: a folded group renders no
+   * rows, so a copy built from the rows would silently put one item on the clipboard instead of two.
+   */
+  fun testCopyAllPendingIsUnaffectedByFolding() {
+    val store = FeedbackStore.getInstance(project)
+    store.deleteAll()
+    store.add(item("p0"))
+    store.add(item("p1"))
+    store.add(item("r0", Status.RESOLVED))
+
+    val panel = newPanel()
+    waitFor("initial render") { panel.pendingCountForTest() == 2 }
+    val copyAll = copyGroup(panel).childActionsOrStubs
+      .single { it.templatePresentation.text == "Copy All Pending" }
+
+    copyAll.actionPerformed(event())
+    val unfolded = clipboardText()
+
+    panel.toggleGroupForTest(Status.PENDING)
+    waitFor("pending folded") { panel.listForTest().model.size == 2 } // two headers, no item rows
+    copyAll.actionPerformed(event())
+
+    assertEquals(unfolded, clipboardText())
+    assertTrue(unfolded, unfolded.contains("note-p0"))
+    assertTrue(unfolded, unfolded.contains("note-p1"))
+    // Resolved is history, not work to hand over.
+    assertFalse(unfolded, unfolded.contains("note-r0"))
   }
 
   /** A pinned file can be deleted after capture; navigating must report, not throw. */

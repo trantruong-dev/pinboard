@@ -49,6 +49,9 @@ class FeedbackMarkdownTest {
     fileMissing: Boolean = false,
   ) = FeedbackMarkdown.render(FeedbackItemNode(feedback, stale, fileMissing))
 
+  private fun node(feedback: Feedback = feedback(), stale: Boolean = false) =
+    FeedbackItemNode(feedback, stale, fileMissing = false)
+
   private fun message(author: Author, body: String) =
     Message(id = "m-$body", author = author, body = body, createdAt = 1_757_260_860_000)
 
@@ -163,6 +166,50 @@ class FeedbackMarkdownTest {
   fun metaLineCarriesAFormattedTimestamp() {
     val metaLine = render().lines()[1]
     assertTrue(metaLine, Regex("""^Pinned \d{4}-\d{2}-\d{2} \d{2}:\d{2}$""").matches(metaLine))
+  }
+
+  @Test
+  fun renderAllOfNothingIsEmpty() {
+    // The caller decides whether that is worth putting on a clipboard.
+    assertEquals("", FeedbackMarkdown.renderAll(emptyList()))
+  }
+
+  @Test
+  fun renderAllOfOneItemIsThatItemUnderACount() {
+    val only = node()
+    assertEquals(
+      "## 1 pinned item\n\n" + FeedbackMarkdown.render(only),
+      FeedbackMarkdown.renderAll(listOf(only)),
+    )
+  }
+
+  @Test
+  fun renderAllKeepsOrderAndSeparatesWithARule() {
+    val nodes = listOf(
+      node(feedback(note = "first")),
+      node(feedback(note = "second")),
+      node(feedback(note = "third")),
+    )
+    val text = FeedbackMarkdown.renderAll(nodes)
+
+    assertTrue(text.startsWith("## 3 pinned items\n\n### "))
+    assertEquals(2, Regex("""^---$""", RegexOption.MULTILINE).findAll(text).count())
+    assertTrue(text.indexOf("first") < text.indexOf("second"))
+    assertTrue(text.indexOf("second") < text.indexOf("third"))
+    // Every item still opens its own section, so a viewer cannot read two pins as one.
+    assertEquals(3, Regex("""^### """, RegexOption.MULTILINE).findAll(text).count())
+  }
+
+  /** The batch is for handing work over, so what the agent is told about each item must survive
+   *  the join - the stale suffix most of all. */
+  @Test
+  fun renderAllKeepsEachItemWhole() {
+    val nodes = listOf(node(stale = true), node(feedback(thread = listOf(message(Author.AGENT, "on it")))))
+    val text = FeedbackMarkdown.renderAll(nodes)
+
+    assertTrue(text.contains(" - stale: code changed since pinned"))
+    assertTrue(text.contains("- Agent ("))
+    nodes.forEach { assertTrue(text.contains(FeedbackMarkdown.render(it))) }
   }
 
   /** The whole shape in one place, so a change to any separator has to be a deliberate one. */

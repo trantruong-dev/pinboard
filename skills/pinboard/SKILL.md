@@ -52,6 +52,11 @@ Then read the item:
   *what they were looking at*.
 - `filePath`, `startLine`, `endLine` locate it. Lines are 1-based and inclusive.
 - `symbolPath` names the enclosing symbol, for example `com.example.Calculator#add`.
+- `thread` is the conversation so far, trimmed to the newest messages. When `threadOmitted` is
+  above zero, that many older messages exist that you are not being shown - the developer can still
+  read them in their panel, so ask rather than assuming the history is complete. A single enormous
+  message is cut too, and says so where it was cut, but the limit is high enough that a normal
+  stack trace or diff arrives whole. The note itself is never trimmed.
 
 **When `stale` is true, the file changed after they pinned it.** Do not trust the line numbers.
 Use `codeSnapshot` to know what they meant and `symbolPath` to find where that code lives now. If

@@ -4,10 +4,12 @@ import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.PlatformDataKeys
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext
+import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import dev.pinboard.model.Feedback
 import dev.pinboard.model.Scope
 import dev.pinboard.model.Status
+import java.awt.datatransfer.StringSelection
 import javax.swing.JEditorPane
 import javax.swing.JPanel
 
@@ -17,12 +19,12 @@ import javax.swing.JPanel
  */
 class CopyFeedbackActionTest : BasePlatformTestCase() {
 
-  private fun node() = FeedbackItemNode(
+  private fun node(note: String = "the whole note") = FeedbackItemNode(
     feedback = Feedback(
-      id = "id",
+      id = "id-$note",
       status = Status.PENDING,
       scope = Scope.SELECTION,
-      note = "the whole note",
+      note = note,
       filePath = "src/Foo.kt",
       language = "Kotlin",
       startLine = 12,
@@ -52,6 +54,12 @@ class CopyFeedbackActionTest : BasePlatformTestCase() {
   }
 
   private fun action() = CopyFeedbackAction { node() }
+
+  /** The panel answers both questions from the same model; so does this. */
+  private fun supplierOf(nodes: List<FeedbackItemNode>) = object : PendingFeedbackSupplier {
+    override fun pending() = nodes
+    override fun hasPending() = nodes.isNotEmpty()
+  }
 
   fun testHighlightedTextIsWhatGetsCopied() {
     val e = event(paneWithSelection("the whole note", 4, 9))
@@ -110,9 +118,47 @@ class CopyFeedbackActionTest : BasePlatformTestCase() {
     assertEquals("ab", selectedTextIn(paneWithSelection("abc", 0, 2)))
   }
 
+  fun testCopyAllPendingPutsEveryItemOnTheClipboard() {
+    val e = event(JPanel())
+    val nodes = listOf(node(), node("second"))
+    val action = CopyAllPendingAction(supplierOf(nodes))
+
+    action.update(e)
+    action.actionPerformed(e)
+
+    assertTrue(e.presentation.isEnabled)
+    assertEquals(FeedbackMarkdown.renderAll(nodes), clipboardText())
+  }
+
+  /** Nothing pending is nothing to hand over, and wiping the clipboard is not what was asked. */
+  fun testCopyAllPendingIsDisabledAndWritesNothingWithAnEmptyQueue() {
+    CopyPasteManager.getInstance().setContents(StringSelection("untouched"))
+    val e = event(JPanel())
+    val action = CopyAllPendingAction(supplierOf(emptyList()))
+
+    action.update(e)
+    action.actionPerformed(e)
+
+    assertFalse(e.presentation.isEnabled)
+    assertEquals("untouched", clipboardText())
+  }
+
+  /** Two Copy entries sit in the same menu, so the labels are what keeps them apart. */
+  fun testCopyAllPendingKeepsItsOwnLabel() {
+    val e = event(paneWithSelection("the whole note", 4, 9))
+    val action = CopyAllPendingAction(supplierOf(listOf(node())))
+
+    action.update(e)
+
+    // The single-item Copy relabels itself to "Copy Selection" over highlighted text. This one is
+    // the batch either way, so its label is fixed and a text selection must not retarget it.
+    assertEquals("Copy All Pending", action.templatePresentation.text)
+    assertTrue(e.presentation.isEnabled)
+  }
+
   private fun clipboardText(): String =
     checkNotNull(
-      com.intellij.openapi.ide.CopyPasteManager.getInstance()
+      CopyPasteManager.getInstance()
         .getContents<String>(java.awt.datatransfer.DataFlavor.stringFlavor),
     ) { "nothing on the clipboard" }
 }

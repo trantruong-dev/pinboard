@@ -45,7 +45,9 @@ class FeedbackToolset : McpToolset {
       "do not treat acknowledged as done). Each item carries its own status field, so a resumed agent " +
       "can tell the two apart. RESOLVED and DISMISSED are hidden unless status is given. " +
       "Items include a stale flag when the code has changed since capture; use the original codeSnapshot " +
-      "as the source of truth and symbolPath to relocate."
+      "as the source of truth and symbolPath to relocate. " +
+      "Long threads are trimmed to the newest messages and threadOmitted says how many were dropped; " +
+      "the note itself is never trimmed."
   )
   suspend fun feedback_list(
     status: String? = null,
@@ -138,7 +140,8 @@ class FeedbackToolset : McpToolset {
       "Use this to pick up feedback without polling: call it in a loop, since it is meant to return " +
       "empty and be called again. After the first new item arrives, waits up to batchWindowSeconds to " +
       "collect a cluster. Keep timeoutSeconds well under your own tool-call timeout - the IDE will " +
-      "happily block for minutes, but the MCP client gives up first and you lose the call."
+      "happily block for minutes, but the MCP client gives up first and you lose the call. " +
+      "Items come back shaped exactly as feedback_list returns them, threadOmitted included."
   )
   suspend fun feedback_watch(
     // 60s, not 120s: measured against a real Claude Code client, a 150s call is cut off by the
