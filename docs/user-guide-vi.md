@@ -430,6 +430,13 @@ thực sự đã đến, và chỉ nói đúng chừng đó.
 MCP client của bạn có thể hiển thị các tool này kèm tiền tố lấy từ tên server, ví dụ
 `mcp__idea__feedback_list`. Đó là bình thường.
 
+Hội thoại dài sẽ được cắt bớt trước khi tới agent: mỗi mục chỉ gửi 10 tin nhắn mới nhất, mỗi tin tối
+đa 1MB, kèm số đếm `threadOmitted` cho agent biết nó không được thấy bao nhiêu tin cũ. Số lượng tin
+mới là thứ thực sự cắt bớt; giới hạn dung lượng chỉ để một file bị dump không chiếm trọn payload, nên
+một stack trace hay diff bình thường vẫn tới nguyên vẹn. Ghi chú của bạn thì không bao giờ bị cắt, và
+không có gì bị giấu khỏi bạn - panel vẫn giữ nguyên cả luồng. Mục đích là để một agent đang xử lý cả
+lô không tự lấp đầy context của chính nó bằng chính câu trả lời của nó.
+
 **Agent không thể tạo góp ý, và không thể xóa bất cứ thứ gì còn pending hoặc acknowledged.** Ranh giới
 đó là cố ý. Hàng đợi là bản ghi của bạn về những gì bạn đã yêu cầu, và một agent có thể âm thầm dọn
 sạch phần việc nó chưa làm xong sẽ hủy mất bản ghi duy nhất đó.

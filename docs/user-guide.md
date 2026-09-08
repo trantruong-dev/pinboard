@@ -434,6 +434,13 @@ arrived, and nothing more.
 Your MCP client may show these under a prefix taken from the server name, for example
 `mcp__idea__feedback_list`. That is normal.
 
+Long conversations reach the agent trimmed: the 10 newest messages on an item, each capped at 1MB,
+with a `threadOmitted` count telling it how many older ones it is not seeing. The message count is
+what does the trimming; the size cap is only there to stop one dumped file being the whole payload,
+so an ordinary stack trace or diff arrives whole. Your note is never trimmed, and nothing is hidden
+from you - the panel still holds the whole thread. The point is that an agent working through a
+batch cannot fill its own context with its own replies.
+
 **The agent cannot create feedback, and cannot delete anything still pending or acknowledged.** That
 boundary is deliberate. The queue is your record of what you asked for, and an agent that could
 quietly clear work it had not finished would destroy the only copy of it.

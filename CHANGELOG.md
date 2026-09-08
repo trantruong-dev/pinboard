@@ -6,6 +6,13 @@
 
 ### Changed
 
+- The thread an agent receives per item is capped at the 10 newest messages, each message body at
+  1MB, and the item carries `threadOmitted` saying how many were dropped. The code snapshot was
+  already capped for the same reason; the thread was not, so an agent that replied repeatedly grew
+  its own context with nothing bounding it. This bounds what the agent wrote, not your note, which
+  is still sent whole however long it is. Nothing is hidden from you either - the panel still shows
+  the entire thread.
+
 ### Deprecated
 
 ### Removed
