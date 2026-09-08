@@ -177,6 +177,43 @@ tasks.register("checkReleaseNotes") {
   }
 }
 
+// The same section again, once patchChangelog has turned it into a version heading, written out for
+// `gh release create --notes-file`. The GitHub release and the Marketplace description then say the
+// same thing, because both are the one section a person wrote in CHANGELOG.md.
+//
+// A task rather than shell in the Makefile: that recipe has to read the same under cmd.exe and sh,
+// and pulling a section out of a file is exactly the kind of text handling the two disagree about.
+tasks.register("writeReleaseNotes") {
+  group = "release"
+  description = "Writes the current version's CHANGELOG.md section to build/release-notes.md."
+
+  val changelogFile = layout.projectDirectory.file("CHANGELOG.md").asFile
+  val notesFile = layout.buildDirectory.file("release-notes.md").get().asFile
+  // Read at configuration time: the configuration cache forbids reaching for the project at
+  // execution time, and the version cannot change inside one invocation anyway.
+  val releaseVersion = project.version.toString()
+
+  doLast {
+    val heading = "## [$releaseVersion]"
+    val text = changelogFile.readText()
+    val start = text.indexOf(heading)
+    require(start >= 0) {
+      "CHANGELOG.md has no $heading section - roll Unreleased into it with patchChangelog first."
+    }
+
+    // From the end of the heading line to the next version heading, so the date on the heading and
+    // the compare link below the last section are both left out.
+    val rest = text.substring(text.indexOf('\n', start) + 1)
+    val end = rest.indexOf("\n## ")
+    val body = (if (end >= 0) rest.substring(0, end) else rest).trim()
+    require(body.isNotEmpty()) { "The $heading section is empty - there is nothing to describe." }
+
+    notesFile.parentFile.mkdirs()
+    notesFile.writeText(body + "\n")
+    logger.lifecycle("Release notes for $releaseVersion -> ${notesFile.path}")
+  }
+}
+
 changelog {
   version = project.version.toString()
   path = file("CHANGELOG.md").canonicalPath
