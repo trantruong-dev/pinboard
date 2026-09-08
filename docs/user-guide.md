@@ -334,6 +334,8 @@ The **Pinboard** tool window on the right shows the queue as cards, grouped by s
 | Fold or unfold a status group | Click the status header |
 | Edit a pending note | **F2**, the toolbar button, or the card's right-click menu |
 | Delete one item | **Del**, the toolbar button, or the card's right-click menu |
+| Copy one item as Markdown | **Copy** on the toolbar, the card's right-click menu, right-click inside the detail pane with nothing highlighted, or **Ctrl+C** with the list focused |
+| Copy just the text you highlighted | Drag over it, then **Copy Selection** from the right-click menu, or **Ctrl+C** |
 | Delete finished work in bulk | **Clear** dropdown: *Clear resolved*, *Clear dismissed* |
 | Delete everything | **Delete All** - it asks first, because it cannot be undone |
 
@@ -341,7 +343,29 @@ Across the top, a bar shows how much of the queue is done. The tool window icon 
 anything is still pending, so you can see there is outstanding work without opening the panel.
 
 Selecting a card shows the detail pane: where it points, whether the code moved, the note itself,
-the code as it was when you pinned it, and the whole conversation with the agent.
+the code as it was when you pinned it, and the whole conversation with the agent. Every part of that
+is ordinary selectable text - drag over the header, the note, a thread message, or the code snapshot
+and Ctrl+C copies exactly what you highlighted. The code snapshot is a live viewer, not a disabled
+control: it shows as a scrollable block, and Ctrl+F finds text inside it the same as in any editor.
+That block is the only record of what was actually pinned once the file has moved on, which is
+exactly when the stale banner tells you to trust it over the line numbers.
+
+### Copying a whole pin
+
+**Copy** puts the selected item on the clipboard as one block of Markdown - location, status, when
+it was pinned (plus a stale or file-missing note if either applies), the note, the code snapshot in
+a fenced block, and the full conversation. Paste it straight into a chat with an agent that has no
+MCP access to the queue.
+
+Reach it the same four ways Edit and Delete already work: the toolbar button, the card's right-click
+menu, right-clicking inside the detail pane, or **Ctrl+C** with the list itself focused. It is
+disabled when nothing is selected.
+
+Copy never takes more than you asked for. Highlight part of a note and right-click it and the entry
+reads **Copy Selection**, and copies exactly that. Right-click with nothing highlighted and it reads
+**Copy**, and copies the whole pin. The same rule applies to Ctrl+C: with the list focused it copies
+the item, with the caret inside a note or the code snapshot it copies your selection there, because
+the detail pane is not part of the list and its own selection wins.
 
 ---
 

@@ -330,6 +330,8 @@ Tool window **Pinboard** bên phải hiển thị hàng đợi dưới dạng th
 | Gập hoặc mở một nhóm trạng thái | Bấm vào tiêu đề nhóm |
 | Sửa ghi chú đang pending | Phím **F2**, nút trên thanh công cụ, hoặc menu chuột phải của thẻ |
 | Xóa một mục | Phím **Del**, nút trên thanh công cụ, hoặc menu chuột phải của thẻ |
+| Copy một mục dưới dạng Markdown | Nút **Copy** trên thanh công cụ, menu chuột phải của thẻ, chuột phải trong khung chi tiết khi không bôi đen gì, hoặc **Ctrl+C** khi danh sách đang được focus |
+| Copy đúng phần đang bôi đen | Bôi đen rồi chọn **Copy Selection** trong menu chuột phải, hoặc **Ctrl+C** |
 | Xóa hàng loạt việc đã xong | Menu **Clear**: *Clear resolved*, *Clear dismissed* |
 | Xóa sạch | **Delete All** - có hỏi lại, vì không hoàn tác được |
 
@@ -337,7 +339,29 @@ Phía trên có một thanh cho biết đã xử lý được bao nhiêu phần 
 chấm tròn khi còn mục đang chờ, nên bạn biết còn việc mà không cần mở panel ra.
 
 Chọn một thẻ sẽ hiện khung chi tiết: nó trỏ vào đâu, code đã dịch chuyển chưa, nội dung ghi chú, đoạn
-code tại thời điểm ghim, và toàn bộ hội thoại với agent.
+code tại thời điểm ghim, và toàn bộ hội thoại với agent. Mọi phần trong đó đều là văn bản chọn được
+bình thường - bôi đen dòng tiêu đề, ghi chú, một tin nhắn trong luồng, hay đoạn code, rồi Ctrl+C là
+copy đúng phần bạn vừa bôi đen. Đoạn code là một khung xem trực tiếp chứ không phải ô bị vô hiệu hóa:
+nó hiện thành một khối cuộn được, và Ctrl+F tìm được chữ bên trong y như trong một editor bình
+thường. Khối đó là bản ghi duy nhất về thứ đã thực sự được ghim một khi file đã thay đổi - đúng lúc
+mà cảnh báo stale bảo bạn tin vào nó thay vì tin số dòng.
+
+### Copy nguyên một pin
+
+**Copy** đưa mục đang chọn lên clipboard thành một khối Markdown duy nhất - vị trí, trạng thái, thời
+điểm ghim (kèm ghi chú stale hoặc file missing nếu có), ghi chú, đoạn code trong một khối code có
+fence, và toàn bộ hội thoại. Dán thẳng vào khung chat với một agent không có quyền truy cập MCP vào
+hàng đợi.
+
+Có bốn cách để dùng, giống hệt Edit và Delete: nút trên thanh công cụ, menu chuột phải của thẻ, chuột
+phải trong khung chi tiết, hoặc **Ctrl+C** khi danh sách đang được focus. Nút này bị vô hiệu khi chưa
+chọn mục nào.
+
+Copy không bao giờ lấy nhiều hơn thứ bạn yêu cầu. Bôi đen một phần ghi chú rồi bấm chuột phải, mục
+trong menu hiện là **Copy Selection** và chỉ copy đúng phần đó. Bấm chuột phải khi không bôi đen gì
+thì mục đó là **Copy** và copy nguyên pin. Ctrl+C cũng theo đúng quy tắc này: khi danh sách đang
+focus thì copy cả mục, khi con trỏ nằm trong ghi chú hoặc đoạn code thì copy phần bạn bôi đen ở đó -
+vì khung chi tiết không nằm trong danh sách, nên vùng chọn của riêng nó thắng.
 
 ---
 

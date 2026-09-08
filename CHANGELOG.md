@@ -7,14 +7,31 @@
 - Edit the note on a pin that is still pending, from the tool window: `F2`, the toolbar button, or
   the row's context menu. Locked once the agent acknowledges the item, since it is already working
   from the words it read. Only the wording changes; the pinned code stays as captured.
+- Copy a whole pin as paste-ready Markdown: location, status, pinned timestamp, the stale or
+  file-missing note when applicable, the note, the code snapshot in a fenced block, and the whole
+  conversation. Reachable the same four ways as Edit and Delete - the toolbar button, the row's
+  context menu, right-click inside the detail panel, or Ctrl+C with the list focused. Disabled when
+  nothing is selected. When text in the detail panel is highlighted the entry reads Copy Selection
+  and copies exactly that, so the gesture never quietly takes more than you asked for.
 
 ### Changed
+
+- The detail panel's header, note, and conversation messages are focusable and selectable, so any
+  visible text can be dragged over and copied. They used to be non-focusable HTML panes that
+  neither highlighted nor copied.
+- The code snapshot in the detail panel is a live read-only viewer instead of a disabled editor:
+  full contrast, selectable, copyable, and Ctrl+F works inside it. It is still read-only.
+- The code snapshot shows as a scrollable block rather than a single line. Once the file has moved
+  on it is the only record of what was actually pinned, which is when it matters most.
+
+### Fixed
+
+- Folding or unfolding a status group no longer clears the selection and the detail panel. Expanding
+  Resolved to glance at something used to deselect whatever you were reading.
 
 ### Deprecated
 
 ### Removed
-
-### Fixed
 
 ### Security
 

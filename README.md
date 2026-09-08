@@ -71,6 +71,13 @@ tool window icon carries a dot while anything is pending. Click a status header 
 Double-click an item or press Enter to jump back to the code. Delete a single item with the Del key,
 the toolbar button, or the row's context menu; **Clear** removes finished work in bulk.
 
+**Read and copy a pin.** Select a card and the detail pane below the queue shows where it points, the
+note, the code as it was when you pinned it, and the conversation - all of it selectable text, so you
+can drag over any part and Ctrl+C it. To copy the whole item as paste-ready Markdown instead, use the
+**Copy** toolbar button, the row's context menu, or press Ctrl+C with the list itself focused. Copy
+follows what you highlighted: right-click text you have dragged over and the menu offers **Copy
+Selection** for exactly that, not the whole pin.
+
 ## Teaching your agent to use it
 
 The tools are available as soon as the plugin is installed, but an agent will not know when to reach

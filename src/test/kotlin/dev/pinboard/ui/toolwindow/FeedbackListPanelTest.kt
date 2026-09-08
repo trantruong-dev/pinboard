@@ -116,6 +116,51 @@ class FeedbackListPanelTest : BasePlatformTestCase() {
     assertEquals("keep2", selectedId(panel))
   }
 
+  /**
+   * A rebuild caused by an item the user is not looking at must not reach into the detail panel.
+   * Rebuilding it throws away whatever text the user was in the middle of selecting there.
+   */
+  fun testUnrelatedUpdateLeavesDetailPanelUntouched() {
+    val store = FeedbackStore.getInstance(project)
+    store.deleteAll()
+    repeat(5) { store.add(item("keep$it")) }
+
+    val panel = newPanel()
+    waitFor("initial render") { panel.pendingCountForTest() == 5 }
+
+    panel.listForTest().selectedIndex = indexOf(panel, "keep2")
+    val shown = panel.detailForTest().getComponent(0)
+
+    store.updateStatus("keep4", Status.ACKNOWLEDGED)
+    waitFor("panel reflects the status change") { panel.pendingCountForTest() == 4 }
+
+    assertSame(shown, panel.detailForTest().getComponent(0))
+  }
+
+  /**
+   * The limit of the guard above, through the real rebuild path rather than a direct `show` call.
+   * A guard widened by accident would keep the negative test green while the panel silently stopped
+   * updating for the item the user is actually watching.
+   */
+  fun testUpdateToTheShownItemDoesRebuildTheDetailPanel() {
+    val store = FeedbackStore.getInstance(project)
+    store.deleteAll()
+    repeat(5) { store.add(item("keep$it")) }
+
+    val panel = newPanel()
+    waitFor("initial render") { panel.pendingCountForTest() == 5 }
+
+    panel.listForTest().selectedIndex = indexOf(panel, "keep2")
+    val shown = panel.detailForTest().getComponent(0)
+
+    store.updateStatus("keep2", Status.ACKNOWLEDGED)
+    waitFor("detail panel rebuilds for the shown item") {
+      panel.detailForTest().getComponent(0) !== shown
+    }
+
+    assertEquals("keep2", selectedId(panel))
+  }
+
   fun testDeletedItemClearsSelectionInsteadOfThrowing() {
     val store = FeedbackStore.getInstance(project)
     store.deleteAll()
@@ -153,6 +198,49 @@ class FeedbackListPanelTest : BasePlatformTestCase() {
 
     assertTrue(headers(panel).first { it.status == Status.PENDING }.collapsed)
     assertEquals(-1, indexOf(panel, "fold0"))
+  }
+
+  /**
+   * Folding rebuilds the rows the same way a store mutation does, so it needs the same guard.
+   * Expanding Resolved to glance at something must not deselect the item being read, nor tear down
+   * the detail panel showing it.
+   */
+  fun testFoldingAnotherGroupKeepsSelectionAndDetail() {
+    val store = FeedbackStore.getInstance(project)
+    store.deleteAll()
+    repeat(3) { store.add(item("keep$it")) }
+    store.add(item("done", Status.RESOLVED))
+
+    val panel = newPanel()
+    waitFor("initial render") { panel.pendingCountForTest() == 3 }
+
+    panel.listForTest().selectedIndex = indexOf(panel, "keep1")
+    val shown = panel.detailForTest().getComponent(0)
+
+    panel.toggleGroupForTest(Status.RESOLVED) // starts collapsed, so this expands it
+
+    assertTrue(indexOf(panel, "done") > 0)
+    assertEquals("keep1", selectedId(panel))
+    assertSame(shown, panel.detailForTest().getComponent(0))
+  }
+
+  /** Folding the group that holds the selection does clear the panel: the item is off screen. */
+  fun testFoldingTheSelectedGroupClearsTheDetail() {
+    val store = FeedbackStore.getInstance(project)
+    store.deleteAll()
+    repeat(3) { store.add(item("hide$it")) }
+
+    val panel = newPanel()
+    waitFor("initial render") { panel.pendingCountForTest() == 3 }
+
+    panel.listForTest().selectedIndex = indexOf(panel, "hide1")
+    val shown = panel.detailForTest().getComponent(0)
+
+    panel.toggleGroupForTest(Status.PENDING)
+
+    assertEquals(-1, indexOf(panel, "hide1"))
+    assertNull(selectedId(panel))
+    assertNotSame(shown, panel.detailForTest().getComponent(0))
   }
 
   /** A pinned file can be deleted after capture; navigating must report, not throw. */
