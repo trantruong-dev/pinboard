@@ -15,6 +15,8 @@ import dev.pinboard.model.Feedback
 import dev.pinboard.model.Scope
 import dev.pinboard.model.Status
 import dev.pinboard.store.FeedbackStore
+import dev.pinboard.ui.dialog.FeedbackInputDialog
+import dev.pinboard.ui.toSnapshot
 import dev.pinboard.util.ProjectFiles
 
 /** Supplies the currently selected feedback item to the toolbar actions. */
@@ -54,6 +56,59 @@ object FeedbackNavigator {
   }
 
   const val NOTIFICATION_GROUP = "Pinboard"
+}
+
+/**
+ * Reopens a pinned note so the wording can be fixed.
+ *
+ * PENDING only. Once the agent has acknowledged an item it is working from the words it read, and
+ * rewriting them underneath it is the reliable way to have the two of you acting on different
+ * instructions. The greyed-out button here is only the visible half of that rule - the half that
+ * has to hold is in [FeedbackStore.updateNote], because the agent can acknowledge while this
+ * dialog is open.
+ *
+ * Only the note is editable. The range, the snapshot and the symbol path are what was pinned, and
+ * changing where a note points is a different pin.
+ */
+class EditFeedbackAction(
+  private val project: Project,
+  private val selection: FeedbackSelection,
+) : AnAction("Edit", "Change the note on this pin", AllIcons.Actions.Edit) {
+
+  override fun getActionUpdateThread() = ActionUpdateThread.EDT
+
+  override fun update(e: AnActionEvent) {
+    e.presentation.isEnabled = selection.selected()?.status == Status.PENDING
+  }
+
+  override fun actionPerformed(e: AnActionEvent) {
+    val feedback = selection.selected() ?: return
+    if (feedback.status != Status.PENDING) return
+    val dialog = FeedbackInputDialog(
+      project = project,
+      snapshot = feedback.toSnapshot(),
+      initialNote = feedback.note,
+      dialogTitle = "Edit Pin",
+      okText = "Save",
+    )
+    if (!dialog.showAndGet()) return
+    // Same guard the capture path carries, and for the same reason: the dialog's Ctrl+Enter calls
+    // doOKAction() directly, while validation runs on a delayed alarm, so a note emptied and
+    // submitted inside that window gets through. Blank means "never mind", not an error - handling
+    // it here is also what keeps the notification below able to name its one real cause.
+    if (dialog.note.isEmpty()) return
+    // Refused, with a non-blank note, means the item stopped being PENDING while the dialog was
+    // open. Say so: the user typed those words and is entitled to know they did not land.
+    if (FeedbackStore.getInstance(project).updateNote(feedback.id, dialog.note) == null) {
+      NotificationGroupManager.getInstance()
+        .getNotificationGroup(FeedbackNavigator.NOTIFICATION_GROUP)
+        .createNotification(
+          "The agent picked this item up while you were editing. Your change was not saved.",
+          NotificationType.WARNING,
+        )
+        .notify(project)
+    }
+  }
 }
 
 /** Removes one feedback item. Human-only: the agent has no delete tool. */

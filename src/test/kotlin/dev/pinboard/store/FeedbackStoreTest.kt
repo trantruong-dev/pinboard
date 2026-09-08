@@ -64,6 +64,62 @@ class FeedbackStoreTest : BasePlatformTestCase() {
     assertNull("DISMISSED removed", store.byId("dismissed"))
   }
 
+  fun testUpdateNoteOnPendingItem() {
+    val store = FeedbackStore.getInstance(project)
+    store.deleteAll()
+    // updatedAt starts at 0 rather than "now" so the bump is unambiguous: two calls to
+    // currentTimeMillis() inside the same millisecond would make a "newer than before" assertion
+    // flaky, and the bump is the whole reason FeedbackMerger lets an edit win.
+    store.add(item("1").copy(updatedAt = 0L))
+
+    val updated = store.updateNote("1", "  rewritten  ")
+
+    assertNotNull(updated)
+    assertEquals("note is trimmed before it is stored", "rewritten", updated!!.note)
+    assertTrue("updatedAt must be bumped so the edit wins a merge", updated.updatedAt > 0L)
+    assertEquals("rewritten", store.byId("1")!!.note)
+    store.deleteAll()
+  }
+
+  fun testUpdateNoteRefusesEverythingButPending() {
+    val store = FeedbackStore.getInstance(project)
+    store.deleteAll()
+    store.add(item("acked", Status.ACKNOWLEDGED))
+    store.add(item("resolved", Status.RESOLVED))
+    store.add(item("dismissed", Status.DISMISSED))
+
+    for (id in listOf("acked", "resolved", "dismissed")) {
+      assertNull("$id must not be editable", store.updateNote(id, "rewritten"))
+      assertEquals("$id must be left as it was", "note-$id", store.byId(id)!!.note)
+    }
+    store.deleteAll()
+  }
+
+  fun testUpdateNoteRefusesUnknownIdAndBlankNote() {
+    val store = FeedbackStore.getInstance(project)
+    store.deleteAll()
+    store.add(item("1"))
+
+    assertNull("unknown id", store.updateNote("nope", "rewritten"))
+    assertNull("empty note", store.updateNote("1", ""))
+    assertNull("whitespace-only note", store.updateNote("1", "   \n  "))
+    assertEquals("note-1", store.byId("1")!!.note)
+    store.deleteAll()
+  }
+
+  fun testUpdateNoteIsNoOpWhenUnchanged() {
+    val store = FeedbackStore.getInstance(project)
+    store.deleteAll()
+    store.add(item("1").copy(updatedAt = 12345L))
+
+    // Same text, and the same text with surrounding whitespace, are both non-edits.
+    assertNotNull(store.updateNote("1", "note-1"))
+    assertNotNull(store.updateNote("1", "  note-1  "))
+
+    assertEquals("an unchanged note must not bump updatedAt", 12345L, store.byId("1")!!.updatedAt)
+    store.deleteAll()
+  }
+
   fun testPersistenceAcrossStoreInstances() {
     val store = FeedbackStore.getInstance(project)
     store.deleteAll()

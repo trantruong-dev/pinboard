@@ -4,6 +4,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.CommonShortcuts
+import com.intellij.openapi.actionSystem.CustomShortcutSet
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
@@ -85,11 +86,24 @@ class FeedbackListPanel(
   @Volatile
   private var lastPendingCount = 0
 
+  /**
+   * True while [applyModel] is swapping the model out from under the list.
+   *
+   * The model empties itself before announcing the new rows, which clears the list selection and
+   * fires the listener below with nothing selected. Left to run, that tears the detail panel down
+   * and rebuilds it on every store mutation - including ones to items the user is not even looking
+   * at, taking any text selection in progress with it. Only ever touched on the EDT, so it needs
+   * no volatility.
+   */
+  private var restoringSelection = false
+
   init {
     Disposer.register(parentDisposable, this)
-    detail = FeedbackDetailPanel(project, this)
+    // The panel installs the group on each of its own surfaces: a single handler on its root would
+    // never fire, because Swing delivers a mouse event to the deepest listener and does not bubble.
+    detail = FeedbackDetailPanel(project, this) { buildActionGroup() }
 
-    list.addListSelectionListener { if (!it.valueIsAdjusting) detail.show(selectedNode()) }
+    list.addListSelectionListener { if (!it.valueIsAdjusting && !restoringSelection) detail.show(selectedNode()) }
     installGroupFolding()
     installNavigation()
     installRowActions()
@@ -141,20 +155,36 @@ class FeedbackListPanel(
   }
 
   /**
-   * Delete is reachable three ways on purpose: the toolbar button, the Del key, and the row's own
-   * context menu. A docked tool window is narrow enough that the toolbar can be the first thing
-   * clipped, and right-clicking a row is what the platform trains users to try.
+   * Edit and Delete are each reachable three ways on purpose: the toolbar button, a key, and the
+   * row's own context menu. A docked tool window is narrow enough that the toolbar can be the
+   * first thing clipped, and right-clicking a row is what the platform trains users to try.
    */
   private fun buildActionGroup() = DefaultActionGroup(
+    EditFeedbackAction(project, FeedbackSelection { selectedFeedback() }),
     DeleteFeedbackAction(project, FeedbackSelection { selectedFeedback() }),
+    CopyFeedbackAction(FeedbackNodeSelection { selectedNode() }),
     ClearFeedbackActionGroup(project),
   )
 
   private fun installRowActions() {
-    val group = buildActionGroup()
-    PopupHandler.installPopupMenu(list, group, ActionPlaces.TOOLWINDOW_POPUP)
+    PopupHandler.installPopupMenu(list, buildActionGroup(), ActionPlaces.TOOLWINDOW_POPUP)
     DeleteFeedbackAction(project, FeedbackSelection { selectedFeedback() })
       .registerCustomShortcutSet(CommonShortcuts.getDelete(), list, this)
+    // Bound to `list`, not to the panel. The detail panel is not a descendant of the list, so
+    // Ctrl+C with the caret in a note still copies the user's own selection rather than the item.
+    CopyFeedbackAction(FeedbackNodeSelection { selectedNode() })
+      .registerCustomShortcutSet(CommonShortcuts.getCopy(), list, this)
+    // F2 literally, not CommonShortcuts.getRename(): that resolves to the RenameElement
+    // refactoring, which the default keymap binds to Shift+F6. F2 is what the platform's own
+    // in-list renames use (shelved changes, local branches, commit reword), and it is the gesture
+    // for "change the words on the row I have selected". Enter and double-click are already
+    // spoken for by navigation.
+    EditFeedbackAction(project, FeedbackSelection { selectedFeedback() })
+      .registerCustomShortcutSet(
+        CustomShortcutSet(KeyStroke.getKeyStroke(KeyEvent.VK_F2, 0)),
+        list,
+        this,
+      )
   }
 
   /**
@@ -167,9 +197,30 @@ class FeedbackListPanel(
         val index = list.locationToIndex(e.point).takeIf { it >= 0 } ?: return
         if (!list.getCellBounds(index, index).contains(e.point)) return
         val row = listModel.getElementAt(index) as? FeedbackRow.StatusHeader ?: return
-        listModel.toggleCollapsed(row.status)
+        toggleGroup(row.status)
       }
     })
+  }
+
+  /**
+   * Folds or unfolds one group, keeping the user's place.
+   *
+   * [FeedbackListModel.toggleCollapsed] rebuilds the rows, which empties the list and clears the
+   * selection exactly as a store mutation does. It needs the same guard: without it, expanding
+   * Resolved to glance at something would deselect the item the user was reading and tear the
+   * detail panel down with it. Folding the group that holds the selection does clear the panel,
+   * which is right - that item is no longer on screen.
+   */
+  private fun toggleGroup(status: Status) {
+    val previouslySelected = selectedFeedback()?.id
+    restoringSelection = true
+    try {
+      listModel.toggleCollapsed(status)
+      restoreSelection(previouslySelected)
+    } finally {
+      restoringSelection = false
+    }
+    detail.show(selectedNode())
   }
 
   private fun buildToolbar(): JComponent {
@@ -230,8 +281,16 @@ class FeedbackListPanel(
     if (disposed || project.isDisposed) return
     val previouslySelected = selectedFeedback()?.id
 
-    listModel.setItems(items, stale)
-    restoreSelection(previouslySelected)
+    restoringSelection = true
+    try {
+      listModel.setItems(items, stale)
+      restoreSelection(previouslySelected)
+    } finally {
+      // An exception inside the swap must not leave the panel permanently deaf to selection.
+      restoringSelection = false
+    }
+    // Exactly one show per rebuild, and it early-returns when the shown item did not change.
+    detail.show(selectedNode())
     ribbon.update(items)
 
     lastPendingCount = pending
@@ -243,12 +302,16 @@ class FeedbackListPanel(
     FeedbackHighlighter.getInstance(project).refresh()
   }
 
-  /** Reselects the same item after a rebuild so an agent update does not move the user's cursor. */
+  /**
+   * Reselects the same item after a rebuild so an agent update does not move the user's cursor.
+   *
+   * Moves the list selection and nothing else. Showing the result is [applyModel]'s job, which is
+   * what keeps it to one call per rebuild instead of one here and another from the listener.
+   */
   private fun restoreSelection(feedbackId: String?) {
     val index = feedbackId?.let { indexOfFeedback(it) } ?: -1
     if (index < 0) {
       list.clearSelection()
-      detail.show(null)
       return
     }
     list.selectedIndex = index
@@ -279,8 +342,11 @@ class FeedbackListPanel(
   /** Test hook: exposes the list so tests can assert row structure and selection. */
   fun listForTest(): JBList<FeedbackRow> = list
 
+  /** Test hook: exposes the detail panel so tests can assert it was not rebuilt. */
+  fun detailForTest(): FeedbackDetailPanel = detail
+
   /** Test hook: folds a group the way clicking its header does. */
-  fun toggleGroupForTest(status: Status) = listModel.toggleCollapsed(status)
+  fun toggleGroupForTest(status: Status) = toggleGroup(status)
 
   override fun dispose() {
     disposed = true

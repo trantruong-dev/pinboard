@@ -153,4 +153,31 @@ class CaptureSelectionActionTest : BasePlatformTestCase() {
       com.intellij.openapi.util.Disposer.dispose(dialog.disposable)
     }
   }
+
+  /**
+   * Editing an existing pin reuses the same dialog, seeded with the note already on it. Seeding
+   * through the constructor rather than by poking noteArea is what keeps "prefill" meaning the
+   * same thing on every path into this form.
+   */
+  fun testTheDialogCanBeSeededWithAnExistingNote() {
+    val dialog = dev.pinboard.ui.dialog.FeedbackInputDialog(
+      project,
+      null,
+      initialNote = "the original note",
+      dialogTitle = "Edit Pin",
+      okText = "Save",
+    )
+    try {
+      assertEquals("the original note", dialog.note)
+      assertEquals("Edit Pin", dialog.title)
+      val form = dialog.preferredFocusedComponent as javax.swing.JTextArea
+      // The literal index, not form.text.length: seeding could break and leave both sides 0.
+      assertEquals("caret sits after the seeded text, ready to type on", 17, form.caretPosition)
+      // The OK button's label is deliberately not asserted: this fixture builds no root pane, so
+      // there are no buttons to walk. The dialog's own rootPane use is null-guarded for the same
+      // reason. Whether "Save" reaches the button is an item on the manual E2E checklist.
+    } finally {
+      com.intellij.openapi.util.Disposer.dispose(dialog.disposable)
+    }
+  }
 }

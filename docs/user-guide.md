@@ -285,6 +285,31 @@ Right-click the file in the **Project** view, or right-click its **editor tab**,
 **Pin File for Agent**. Use this for notes that are about the file as a whole rather than a
 particular line.
 
+### Fixing a note you already pinned
+
+Spotted a typo, or worded it badly? While the item is still **pending**, select it in the tool
+window and do any one of:
+
+- Press **`F2`**
+- Click **Edit** on the toolbar
+- Right-click the row and choose **Edit**
+
+The same box reopens with your note in it, alongside the code you pinned. **`Ctrl+Enter`** saves,
+**Esc** leaves it alone.
+
+Two limits, both deliberate:
+
+- **Only the wording is editable.** The pinned lines and the snapshot taken at capture time stay as
+  they were. To point a note at different code, delete it and pin again.
+- **Acknowledged items are locked.** Once the agent has said it has seen an item, it is working
+  from the words it read. Rewriting them underneath it is the reliable way to end up with the two
+  of you acting on different instructions. Reply to the agent instead.
+
+There is a narrow gap here worth knowing about: an agent can *read* a pending item before it
+acknowledges it. If you edit a note while the agent is mid-run, it may already have the old
+wording. If you edit at the moment it acknowledges, the change is refused and Pinboard tells you so
+rather than silently dropping it.
+
 ### Seeing your pins in the code
 
 A pinned range is:
@@ -307,7 +332,10 @@ The **Pinboard** tool window on the right shows the queue as cards, grouped by s
 |---|---|
 | Jump back to the pinned code | Double-click a card, or select it and press **Enter** |
 | Fold or unfold a status group | Click the status header |
+| Edit a pending note | **F2**, the toolbar button, or the card's right-click menu |
 | Delete one item | **Del**, the toolbar button, or the card's right-click menu |
+| Copy one item as Markdown | **Copy** on the toolbar, the card's right-click menu, right-click inside the detail pane with nothing highlighted, or **Ctrl+C** with the list focused |
+| Copy just the text you highlighted | Drag over it, then **Copy Selection** from the right-click menu, or **Ctrl+C** |
 | Delete finished work in bulk | **Clear** dropdown: *Clear resolved*, *Clear dismissed* |
 | Delete everything | **Delete All** - it asks first, because it cannot be undone |
 
@@ -315,7 +343,29 @@ Across the top, a bar shows how much of the queue is done. The tool window icon 
 anything is still pending, so you can see there is outstanding work without opening the panel.
 
 Selecting a card shows the detail pane: where it points, whether the code moved, the note itself,
-the code as it was when you pinned it, and the whole conversation with the agent.
+the code as it was when you pinned it, and the whole conversation with the agent. Every part of that
+is ordinary selectable text - drag over the header, the note, a thread message, or the code snapshot
+and Ctrl+C copies exactly what you highlighted. The code snapshot is a live viewer, not a disabled
+control: it shows as a scrollable block, and Ctrl+F finds text inside it the same as in any editor.
+That block is the only record of what was actually pinned once the file has moved on, which is
+exactly when the stale banner tells you to trust it over the line numbers.
+
+### Copying a whole pin
+
+**Copy** puts the selected item on the clipboard as one block of Markdown - location, status, when
+it was pinned (plus a stale or file-missing note if either applies), the note, the code snapshot in
+a fenced block, and the full conversation. Paste it straight into a chat with an agent that has no
+MCP access to the queue.
+
+Reach it the same four ways Edit and Delete already work: the toolbar button, the card's right-click
+menu, right-clicking inside the detail pane, or **Ctrl+C** with the list itself focused. It is
+disabled when nothing is selected.
+
+Copy never takes more than you asked for. Highlight part of a note and right-click it and the entry
+reads **Copy Selection**, and copies exactly that. Right-click with nothing highlighted and it reads
+**Copy**, and copies the whole pin. The same rule applies to Ctrl+C: with the list focused it copies
+the item, with the caret inside a note or the code snapshot it copies your selection there, because
+the detail pane is not part of the list and its own selection wins.
 
 ---
 
@@ -335,6 +385,9 @@ push pending items out of view.
 
 **Acknowledged is not done.** If an agent restarts mid-task, acknowledged items are the ones it had
 already started; a well-behaved agent picks them back up.
+
+**Pending is also your window to change your mind about the wording.** Acknowledgement is the
+deadline: after it, the note is locked. See *Fixing a note you already pinned* above.
 
 ### When code changes underneath a pin
 

@@ -55,6 +55,12 @@ the editor to re-read the code does not.
 **Pin a whole file.** Right-click the file in the Project view or its editor tab, **Pin File for
 Agent**.
 
+**Fix a note you already pinned.** While an item is still pending, select it in the tool window and
+press `F2`, click **Edit**, or use the row's context menu. Once the agent has acknowledged the item
+the note is locked: it is already working from those words, and changing them underneath it is how
+the two of you end up acting on different instructions. Only the wording is editable - the pinned
+code is what it was.
+
 **See your pins in the code.** A pinned range is tinted, marked in the error stripe, and carries a
 pin in the gutter that brings the queue forward. Any file with open feedback gets a faint wash on
 its tab. Editing above a pin moves it with the code rather than reporting it stale.
@@ -64,6 +70,13 @@ status, with the agent's replies. A bar across the top shows how much of the que
 tool window icon carries a dot while anything is pending. Click a status header to fold the group.
 Double-click an item or press Enter to jump back to the code. Delete a single item with the Del key,
 the toolbar button, or the row's context menu; **Clear** removes finished work in bulk.
+
+**Read and copy a pin.** Select a card and the detail pane below the queue shows where it points, the
+note, the code as it was when you pinned it, and the conversation - all of it selectable text, so you
+can drag over any part and Ctrl+C it. To copy the whole item as paste-ready Markdown instead, use the
+**Copy** toolbar button, the row's context menu, or press Ctrl+C with the list itself focused. Copy
+follows what you highlighted: right-click text you have dragged over and the menu offers **Copy
+Selection** for exactly that, not the whole pin.
 
 ## Teaching your agent to use it
 

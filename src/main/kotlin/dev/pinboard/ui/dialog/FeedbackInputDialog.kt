@@ -8,21 +8,28 @@ import javax.swing.JComponent
 import javax.swing.KeyStroke
 
 /**
- * Modal fallback for captures with no caret to anchor a balloon to - pinning a whole file from the
- * project tree or a tab.
+ * Modal for the note-writing that has no caret to anchor a balloon to: pinning a whole file from
+ * the project tree or a tab, and reopening an existing note from the tool window to edit it.
  *
- * The body is [FeedbackForm], the same component the balloon uses, so the two capture paths cannot
- * drift apart in what they show or what they accept.
+ * The body is [FeedbackForm], the same component the balloon uses, so the paths cannot drift apart
+ * in what they show or what they accept. Only the frame differs, which is why the title and the OK
+ * label are parameters rather than three near-identical dialogs.
  */
 class FeedbackInputDialog(
   project: Project,
   snapshot: SelectionSnapshot?,
+  initialNote: String = "",
+  dialogTitle: String = "Pin for Agent",
+  okText: String? = null,
 ) : DialogWrapper(project, false) {
 
-  private val form = FeedbackForm(snapshot)
+  private val form = FeedbackForm(snapshot, initialNote = initialNote)
 
   init {
-    title = "Pin for Agent"
+    title = dialogTitle
+    // Before init(): the OK action exists from the constructor, and a label set before init() is
+    // the only one that gets its mnemonic extracted.
+    okText?.let { setOKButtonText(it) }
     init()
     rootPane?.registerKeyboardAction(
       { doOKAction() },

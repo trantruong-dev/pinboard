@@ -282,6 +282,30 @@ Một bong bóng mở ra ngay tại con trỏ. Gõ ghi chú rồi nhấn **`Ctrl
 Chuột phải vào file trong khung **Project**, hoặc chuột phải vào **tab editor** của file, chọn
 **Pin File for Agent**. Dùng cách này cho những ghi chú về cả file chứ không phải một dòng cụ thể.
 
+### Sửa lại ghi chú đã ghim
+
+Gõ sai một chữ, hay viết chưa rõ ý? Chừng nào mục đó còn ở trạng thái **pending**, chọn nó trong
+tool window rồi làm một trong ba cách:
+
+- Bấm **`F2`**
+- Bấm nút **Edit** trên thanh công cụ
+- Chuột phải vào dòng, chọn **Edit**
+
+Đúng khung nhập đó mở lại, ghi chú cũ đã điền sẵn, kèm đoạn code bạn đã ghim. **`Ctrl+Enter`** để
+lưu, **Esc** để bỏ qua.
+
+Hai giới hạn, đều là cố ý:
+
+- **Chỉ sửa được chữ.** Vùng code đã ghim và bản chụp lúc ghim giữ nguyên. Muốn trỏ ghi chú sang
+  đoạn code khác thì xoá đi ghim lại.
+- **Mục đã acknowledged thì khoá.** Một khi agent báo đã đọc, nó đang làm theo đúng những chữ nó
+  đọc được. Sửa chữ dưới chân nó là cách chắc chắn nhất để hai bên làm theo hai chỉ dẫn khác nhau.
+  Trường hợp đó hãy nhắn cho agent chứ đừng sửa pin.
+
+Có một khe hẹp nên biết: agent có thể *đọc* một mục pending trước khi acknowledge nó. Nếu bạn sửa
+ghi chú lúc agent đang chạy giữa chừng thì nó có thể đã cầm bản chữ cũ. Còn nếu bạn sửa đúng lúc nó
+acknowledge, thay đổi sẽ bị từ chối và Pinboard báo cho bạn biết chứ không im lặng nuốt mất.
+
 ### Nhìn thấy pin ngay trong code
 
 Một vùng đã ghim sẽ:
@@ -304,7 +328,10 @@ Tool window **Pinboard** bên phải hiển thị hàng đợi dưới dạng th
 |---|---|
 | Nhảy về đoạn code đã ghim | Nhấp đúp vào thẻ, hoặc chọn thẻ rồi nhấn **Enter** |
 | Gập hoặc mở một nhóm trạng thái | Bấm vào tiêu đề nhóm |
+| Sửa ghi chú đang pending | Phím **F2**, nút trên thanh công cụ, hoặc menu chuột phải của thẻ |
 | Xóa một mục | Phím **Del**, nút trên thanh công cụ, hoặc menu chuột phải của thẻ |
+| Copy một mục dưới dạng Markdown | Nút **Copy** trên thanh công cụ, menu chuột phải của thẻ, chuột phải trong khung chi tiết khi không bôi đen gì, hoặc **Ctrl+C** khi danh sách đang được focus |
+| Copy đúng phần đang bôi đen | Bôi đen rồi chọn **Copy Selection** trong menu chuột phải, hoặc **Ctrl+C** |
 | Xóa hàng loạt việc đã xong | Menu **Clear**: *Clear resolved*, *Clear dismissed* |
 | Xóa sạch | **Delete All** - có hỏi lại, vì không hoàn tác được |
 
@@ -312,7 +339,29 @@ Phía trên có một thanh cho biết đã xử lý được bao nhiêu phần 
 chấm tròn khi còn mục đang chờ, nên bạn biết còn việc mà không cần mở panel ra.
 
 Chọn một thẻ sẽ hiện khung chi tiết: nó trỏ vào đâu, code đã dịch chuyển chưa, nội dung ghi chú, đoạn
-code tại thời điểm ghim, và toàn bộ hội thoại với agent.
+code tại thời điểm ghim, và toàn bộ hội thoại với agent. Mọi phần trong đó đều là văn bản chọn được
+bình thường - bôi đen dòng tiêu đề, ghi chú, một tin nhắn trong luồng, hay đoạn code, rồi Ctrl+C là
+copy đúng phần bạn vừa bôi đen. Đoạn code là một khung xem trực tiếp chứ không phải ô bị vô hiệu hóa:
+nó hiện thành một khối cuộn được, và Ctrl+F tìm được chữ bên trong y như trong một editor bình
+thường. Khối đó là bản ghi duy nhất về thứ đã thực sự được ghim một khi file đã thay đổi - đúng lúc
+mà cảnh báo stale bảo bạn tin vào nó thay vì tin số dòng.
+
+### Copy nguyên một pin
+
+**Copy** đưa mục đang chọn lên clipboard thành một khối Markdown duy nhất - vị trí, trạng thái, thời
+điểm ghim (kèm ghi chú stale hoặc file missing nếu có), ghi chú, đoạn code trong một khối code có
+fence, và toàn bộ hội thoại. Dán thẳng vào khung chat với một agent không có quyền truy cập MCP vào
+hàng đợi.
+
+Có bốn cách để dùng, giống hệt Edit và Delete: nút trên thanh công cụ, menu chuột phải của thẻ, chuột
+phải trong khung chi tiết, hoặc **Ctrl+C** khi danh sách đang được focus. Nút này bị vô hiệu khi chưa
+chọn mục nào.
+
+Copy không bao giờ lấy nhiều hơn thứ bạn yêu cầu. Bôi đen một phần ghi chú rồi bấm chuột phải, mục
+trong menu hiện là **Copy Selection** và chỉ copy đúng phần đó. Bấm chuột phải khi không bôi đen gì
+thì mục đó là **Copy** và copy nguyên pin. Ctrl+C cũng theo đúng quy tắc này: khi danh sách đang
+focus thì copy cả mục, khi con trỏ nằm trong ghi chú hoặc đoạn code thì copy phần bạn bôi đen ở đó -
+vì khung chi tiết không nằm trong danh sách, nên vùng chọn của riêng nó thắng.
 
 ---
 
@@ -332,6 +381,9 @@ ra khỏi tầm nhìn.
 
 **Acknowledged không có nghĩa là xong.** Nếu agent khởi động lại giữa chừng, các mục acknowledged
 chính là những việc nó đã bắt đầu; một agent làm đúng sẽ quay lại làm tiếp.
+
+**Pending cũng là cửa sổ để bạn đổi ý về câu chữ.** Mốc acknowledge là hạn chót: sau đó ghi chú
+bị khoá. Xem mục *Sửa lại ghi chú đã ghim* ở trên.
 
 ### Khi code thay đổi bên dưới một pin
 

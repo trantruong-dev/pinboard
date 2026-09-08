@@ -1,9 +1,12 @@
 package dev.pinboard.ui.toolwindow
 
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.actionSystem.ActionGroup
+import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.text.StringUtil
+import com.intellij.ui.PopupHandler
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.panels.VerticalLayout
@@ -11,11 +14,11 @@ import com.intellij.util.text.DateFormatUtil
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.SwingHelper
 import com.intellij.util.ui.UIUtil
-import dev.pinboard.capture.SelectionSnapshot
 import dev.pinboard.model.Author
 import dev.pinboard.model.Feedback
-import dev.pinboard.model.Scope
 import dev.pinboard.ui.dialog.CodePreviewPanel
+import dev.pinboard.ui.locationLabel
+import dev.pinboard.ui.toSnapshot
 import dev.pinboard.ui.theme.PinboardFonts
 import java.awt.BorderLayout
 import javax.swing.JComponent
@@ -31,22 +34,66 @@ import javax.swing.JPanel
 class FeedbackDetailPanel(
   private val project: Project,
   parentDisposable: Disposable,
+  private val contextMenu: (() -> ActionGroup)? = null,
 ) : JPanel(BorderLayout()), Disposable {
 
   private var previewDisposable: Disposable? = null
 
+  /**
+   * What is on screen right now, so [show] can tell a real change from a repeat.
+   *
+   * Set on every path of [show], the null one included: a stale value here would make the next
+   * call early-return against something the panel is no longer displaying.
+   */
+  private var shownNode: FeedbackItemNode? = null
+
   init {
     Disposer.register(parentDisposable, this)
+    installContextMenu(this) // reachable only in the empty state, where everything else is disabled
     showEmpty()
   }
 
-  /** Renders [node], or the empty state when nothing is selected. */
+  /**
+   * Renders [node], or the empty state when nothing is selected.
+   *
+   * A repeat of what is already shown returns without touching the component tree. Every store
+   * mutation rebuilds the queue, and rebuilding this panel destroys any selection the user is in
+   * the middle of making - so an agent updating some other item must not reach in here. [Feedback]
+   * and [FeedbackItemNode] are data classes, so "the same item" is structural equality, and
+   * `updatedAt` moves on every mutation: a genuine change to the shown item still rebuilds.
+   */
   fun show(node: FeedbackItemNode?) {
+    if (node == shownNode) return
+    // Cleared, not assigned, until the new content is actually up: `removeAll` has already run by
+    // the time `buildContent` could throw, and a field claiming to show what is not there would
+    // make every later call early-return onto a blank panel.
+    shownNode = null
     disposePreview()
     removeAll()
-    if (node == null) showEmpty() else add(JBScrollPane(buildContent(node)), BorderLayout.CENTER)
+    if (node == null) {
+      showEmpty()
+    } else {
+      val scrollPane = JBScrollPane(buildContent(node))
+      installContextMenu(scrollPane) // the blank strip below short content belongs to the scrollpane
+      add(scrollPane, BorderLayout.CENTER)
+    }
+    shownNode = node
     revalidate()
     repaint()
+  }
+
+  /**
+   * Right-click menu for one surface of the panel.
+   *
+   * Swing hands a mouse event to the deepest component that has a listener and never bubbles it to
+   * an ancestor, so a single handler on the panel root stops firing the moment anything is drawn
+   * over it. Every surface a right-click can land on therefore installs its own. The code preview
+   * deliberately gets none: it is deeper still and its own editor menu is the right one there,
+   * because that gesture means "copy my selection".
+   */
+  private fun installContextMenu(component: JComponent) {
+    val group = contextMenu?.invoke() ?: return
+    PopupHandler.installPopupMenu(component, group, ActionPlaces.TOOLWINDOW_POPUP)
   }
 
   private fun showEmpty() {
@@ -59,6 +106,7 @@ class FeedbackDetailPanel(
     val feedback = node.feedback
     val content = JPanel(VerticalLayout(JBUI.scale(8)))
     content.border = JBUI.Borders.empty(8)
+    installContextMenu(content) // catches the section labels and the gaps between blocks
 
     content.add(header(feedback))
     staleBanner(node)?.let { content.add(it) }
@@ -78,14 +126,7 @@ class FeedbackDetailPanel(
   }
 
   private fun header(feedback: Feedback): JComponent {
-    val location = when {
-      feedback.scope == Scope.PROJECT -> "Whole project"
-      feedback.filePath == null -> "Unknown location"
-      feedback.startLine == null -> feedback.filePath
-      feedback.endLine != null && feedback.endLine != feedback.startLine ->
-        "${feedback.filePath}:${feedback.startLine}-${feedback.endLine}"
-      else -> "${feedback.filePath}:${feedback.startLine}"
-    }
+    val location = feedback.locationLabel()
     val status = StatusAppearance.label(feedback.status)
     val created = DateFormatUtil.formatPrettyDateTime(feedback.createdAt)
     return htmlBlock(
@@ -138,8 +179,13 @@ class FeedbackDetailPanel(
   private fun htmlBlock(text: String, escaped: Boolean = false): JComponent {
     val body = if (escaped) text else escape(text).replace("\n", "<br/>")
     val viewer = SwingHelper.createHtmlViewer(true, PinboardFonts.note(), null, null)
+    // The platform hands back a non-focusable pane. Without focus there is no caret, so dragging
+    // over this text paints no selection and Ctrl+C never reaches it - the note is readable and
+    // nothing else. Focusable is what makes it selectable; it stays read-only either way.
+    viewer.isFocusable = true
     viewer.text = "<html><body>$body</body></html>"
     viewer.border = JBUI.Borders.empty()
+    installContextMenu(viewer)
     return viewer
   }
 
@@ -160,16 +206,3 @@ class FeedbackDetailPanel(
     disposePreview()
   }
 }
-
-/** Adapts a stored item back to the shape [CodePreviewPanel] renders. */
-private fun Feedback.toSnapshot(): SelectionSnapshot = SelectionSnapshot(
-  filePath = filePath,
-  language = language,
-  startLine = startLine,
-  endLine = endLine,
-  codeSnapshot = codeSnapshot,
-  contentSha256 = contentSha256,
-  truncated = truncated,
-  symbolPath = symbolPath,
-  vcsRevision = vcsRevision,
-)

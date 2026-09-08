@@ -92,6 +92,32 @@ class FeedbackStore(private val project: Project) : Disposable {
   }
 
   /**
+   * Rewrites the note on a PENDING item. Returns null when the edit is refused.
+   *
+   * The PENDING guard lives here rather than in the action that greys out the button, for the same
+   * reason [deleteResolved] carries its own: a disabled button is decoration, and the case that
+   * actually needs stopping is the agent acknowledging the item while the edit dialog sits open.
+   *
+   * An unchanged note returns the current record untouched - no [Feedback.updatedAt] bump, no
+   * flush. Same reasoning as [updateLocations] skipping an item already at its range: without it,
+   * pressing Save on an untouched note dirties the store and buys a whole rewrite of the file.
+   */
+  fun updateNote(id: String, note: String): Feedback? {
+    val trimmed = note.trim()
+    if (trimmed.isEmpty()) return null
+    lock.withLock {
+      val current = items[id] ?: return null
+      if (current.status != Status.PENDING) return null
+      if (current.note == trimmed) return current
+      val updated = current.copyWithNote(trimmed)
+      items[id] = updated
+      scheduleFlushLocked()
+      publishLocked()
+      return updated
+    }
+  }
+
+  /**
    * Moves items to new line ranges, skipping any already there.
    *
    * This is how the runtime anchoring in [dev.pinboard.capture.AnchorRegistry] becomes durable: a
